@@ -8,37 +8,45 @@ import time
 #  1. 設定＆デザイン（GIGA端末向け最適化）
 # ==========================================
 st.set_page_config(
-    page_title="おかやまデコ活ポケット",
-    page_icon="🌱",
+    page_title="おかやまデコ活チャレンジ",
+    page_icon="🌏",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定 ---
+# --- CSS設定（見やすく、押しやすく） ---
 st.markdown("""
 <style>
-    /* 全体のフォント設定 */
     html, body, [class*="css"] {
         font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     }
-    /* ボタンのスタイル：大きく押しやすく */
+    /* チェックボックス（トグル）周りのデザイン */
+    .stToggle {
+        background-color: #f0f8ff;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #dcdcdc;
+    }
+    .stToggle label {
+        font-size: 18px !important;
+        font-weight: bold;
+        color: #2e8b57;
+    }
+    /* 送信ボタンを大きく目立たせる */
     .stButton>button {
         width: 100%;
-        height: 80px;
+        height: 70px;
         font-size: 20px !important;
-        border-radius: 15px;
+        border-radius: 30px;
         font-weight: bold;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-        border: 2px solid #f0f2f6;
+        background-color: #FF9800; /* 元気なオレンジ色 */
+        color: white;
+        border: none;
     }
-    .stButton>button:active {
-        box-shadow: none;
-        transform: translateY(2px);
-    }
-    /* 入力欄の文字サイズ調整 */
-    .stSelectbox label, .stNumberInput label, .stTextInput label {
-        font-size: 16px !important;
-        font-weight: bold;
+    .stButton>button:hover {
+        color: white;
+        background-color: #F57C00;
     }
     /* 成功メッセージ */
     .stToast {
@@ -77,7 +85,6 @@ def fetch_user_data(school, grade, u_class, number):
         sheet = client.open("decokatsu_db").sheet1
         records = sheet.get_all_records()
         
-        # ID生成：入力された学校名をそのまま使うため、空白除去だけ行う
         clean_school = school.strip()
         user_id = f"{clean_school}_{grade}_{u_class}_{number}"
         
@@ -100,14 +107,18 @@ def fetch_user_data(school, grade, u_class, number):
         st.error(f"データ取得エラー: {e}")
         return None, None, 0
 
-def save_action(user_id, nickname, action, co2_val):
+# まとめて保存するように変更
+def save_daily_challenge(user_id, nickname, target_date, actions_done, total_points, memo):
     client = get_connection()
     if not client: return False
 
     try:
         sheet = client.open("decokatsu_db").sheet1
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        sheet.append_row([now, user_id, nickname, action, co2_val])
+        
+        # [送信日時, ID, ニックネーム, 対象日付, 実施項目(カンマ区切り), 合計CO2, 家族メモ]
+        actions_str = ", ".join(actions_done)
+        sheet.append_row([now, user_id, nickname, target_date, actions_str, total_points, memo])
         return True
     except Exception as e:
         st.error(f"保存失敗: {e}")
@@ -124,12 +135,11 @@ if 'user_info' not in st.session_state:
 # ==========================================
 
 def login_screen():
-    st.image("https://placehold.jp/3d4070/ffffff/800x300.png?text=DecoKatsu", use_column_width=True)
-    st.markdown("### 🏫 デコ活ポケット ログイン")
-    st.info("学校名と、自分の「年・組・番号」を入れてスタート！")
+    st.image("https://placehold.jp/3d4070/ffffff/800x200.png?text=DecoKatsu%20Login", use_column_width=True)
+    st.markdown("### 🏫 チャレンジシートをはじめよう！")
+    st.info("学校名と、自分の「年・組・番号」を入れてね。")
 
     with st.form("login_form"):
-        # --- 変更箇所：学校名を自由入力に変更 ---
         school_input = st.text_input("小学校の名前", placeholder="例：倉敷小学校（毎回おなじ名前を入れてね）")
         
         col1, col2 = st.columns(2)
@@ -138,7 +148,6 @@ def login_screen():
             u_class = st.number_input("組（クラス）", min_value=1, max_value=10, step=1)
         with col2:
             number = st.number_input("出席番号", min_value=1, max_value=50, step=1)
-            # レイアウト調整のための空要素
             st.write("") 
         
         nickname_input = st.text_input("ニックネーム（ひらがな）", placeholder="例：たろう")
@@ -146,18 +155,12 @@ def login_screen():
         submit = st.form_submit_button("スタート！", type="primary")
 
         if submit:
-            # 入力チェック
-            if not school_input:
-                st.warning("小学校の名前を入れてね！")
-                return
-            if not nickname_input:
-                st.warning("ニックネームを入れてね！")
+            if not school_input or not nickname_input:
+                st.warning("学校名とニックネームを入れてね！")
                 return
 
             with st.spinner("データを読み込んでいます..."):
-                # 入力された学校名でデータを検索
                 user_id, saved_name, total = fetch_user_data(school_input, grade, u_class, number)
-                
                 final_name = saved_name if saved_name else nickname_input
                 
                 st.session_state.user_info = {
@@ -171,70 +174,98 @@ def login_screen():
 def main_screen():
     user = st.session_state.user_info
     
-    st.markdown(f"**👋 {user['name']} さんのチャレンジ**")
+    st.markdown(f"**👋 こんにちは、{user['name']} さん！**")
     
-    # 目標設定
+    # --- メーター表示 ---
     GOAL = 3000
     current = user['total_co2']
+    st.progress(min(current / GOAL, 1.0))
+    st.caption(f"現在のCO2削減パワー: **{current} g** / 目標 {GOAL} g")
     
-    col_m1, col_m2 = st.columns([2, 1])
-    with col_m1:
-        st.metric(label="現在のCO2削減量", value=f"{current} g")
-    with col_m2:
-        st.write(f"目標まで\nあと {max(0, GOAL - current)} g")
-
-    progress_val = min(current / GOAL, 1.0)
-    st.progress(progress_val)
-    
-    if progress_val >= 1.0:
-        st.balloons()
-        st.success("🎉 おめでとう！目標達成！")
-
     st.markdown("---")
-    st.markdown("### 👇 やったことをタップ！")
+    
+    # === デジタル・チャレンジシート部分 ===
+    st.header("📝 今日のチャレンジ")
+    
+    # 1. 日付選択（タブではなくセレクトボックスでシンプルに）
+    # チラシに合わせて日付を用意
+    date_options = ["6/1 (土)", "6/2 (日)", "6/3 (月)", "6/4 (火)", "6/5 (水)", "6/6 (木)", "6/7 (日)"]
+    
+    # デフォルトで「今日」に近い日付を選ばせるロジック（簡易版）
+    today_md = datetime.date.today().strftime("%-m/%-d")
+    default_idx = 0
+    for i, d in enumerate(date_options):
+        if today_md in d:
+            default_idx = i
+            
+    target_date = st.selectbox("📅 日付を選んでね", date_options, index=default_idx)
+    
+    st.info(f"【{target_date}】 できたことにスイッチを入れよう！")
 
-    col1, col2 = st.columns(2)
-
-    def create_action_btn(col, label, point, icon, color_msg):
-        with col:
-            btn_label = f"{icon} {label}\n(+{point}g)"
-            if st.button(btn_label):
-                with st.spinner('記録中...'):
-                    if save_action(user['id'], user['name'], label, point):
-                        st.session_state.user_info['total_co2'] += point
-                        st.toast(f"{color_msg}！ +{point}g", icon="✨")
-                        time.sleep(1)
+    # 入力フォーム
+    with st.form("challenge_form"):
+        # 2. チェック項目（チラシの①〜⑤）
+        # ONにすると「やった！」感が出るようにtoggleを使用
+        
+        check_1 = st.toggle("① 💡 電気を消した (+50g)", help="使っていない部屋の電気をこまめに消そう")
+        check_2 = st.toggle("② 🍚 残さず食べた (+100g)", help="給食や晩ごはん、残さず食べたかな？")
+        check_3 = st.toggle("③ 🚰 水を止めた (+30g)", help="歯磨きのとき、水を流しっぱなしにしてない？")
+        check_4 = st.toggle("④ ♻️ 正しく分けた (+80g)", help="ゴミを分別したり、リサイクルしたかな？")
+        check_5 = st.toggle("⑤ 🍴 マイ・デコ活 (+50g)", help="自分だけの特別なエコ活動をしたかな？")
+        
+        st.markdown("---")
+        
+        # 3. 家族会議メモ（チラシ中段の内容）
+        st.markdown("**🏡 家族で作戦会議！**")
+        memo_input = st.text_area("地球のために、これから我が家でできること（任意）", height=80, placeholder="例：買い物のときはエコバッグを持つ！")
+        
+        submit_challenge = st.form_submit_button("✅ まとめて送信！")
+        
+        if submit_challenge:
+            # ポイント計算
+            points = 0
+            actions = []
+            if check_1: 
+                points += 50
+                actions.append("電気")
+            if check_2: 
+                points += 100
+                actions.append("食事")
+            if check_3: 
+                points += 30
+                actions.append("水")
+            if check_4: 
+                points += 80
+                actions.append("分別")
+            if check_5: 
+                points += 50
+                actions.append("マイデコ")
+            
+            if points == 0 and not memo_input:
+                st.warning("何かひとつでもチェックを入れてね！")
+            else:
+                with st.spinner("記録しています..."):
+                    if save_daily_challenge(user['id'], user['name'], target_date, actions, points, memo_input):
+                        st.session_state.user_info['total_co2'] += points
+                        st.balloons()
+                        st.success(f"{points}g のパワーを送ったよ！明日もがんばろう！")
+                        time.sleep(2)
                         st.rerun()
 
-    create_action_btn(col1, "電気を消す", 50, "💡", "ナイス")
-    create_action_btn(col1, "水を止める", 30, "🚰", "いいね")
-    create_action_btn(col1, "徒歩・自転車", 100, "🚲", "すごい")
-
-    create_action_btn(col2, "残さず食べる", 100, "🍚", "えらい")
-    create_action_btn(col2, "ゴミ分別", 80, "♻️", "さすが")
-    create_action_btn(col2, "家族と話す", 50, "👨‍👩‍👧", "すてき")
-
     st.markdown("---")
     
-    tab1, tab2 = st.tabs(["📅 イベント情報", "🎟 ガラポン参加証"])
-    
-    with tab1:
-        st.subheader("🎉 おかやまデコ活フェス2026")
-        st.info("**日時:** 6月6日(土)・7日(日) 10:00〜16:00\n\n**場所:** イオンモール倉敷 1F")
-        st.markdown("* ✨ EV車展示 / ガラポン抽選会 / スタンプラリー")
-    
-    with tab2:
-        st.subheader("会場でガラポン！")
+    # === 完了・イベント案内 ===
+    with st.expander("🎟 ガラポン参加証を表示する"):
         if user['total_co2'] > 0:
-            st.success("この画面を会場の受付で見せてね！")
+            st.success("会場の受付でこれを見せてね！")
             qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={user['id']}"
             st.image(qr_url, width=200)
-            st.caption(f"ID: {user['id']}")
+            st.write(f"ID: {user['id']}")
         else:
-            st.warning("まずはポイントを貯めよう！")
-    
+            st.warning("まずはチャレンジを送信してポイントを貯めよう！")
+
     st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("ログアウト"):
+    if st.button("ログアウト", key="logout"):
         st.session_state.user_info = None
         st.rerun()
 
