@@ -40,7 +40,7 @@ st.markdown("""
         font-size: 20px !important;
         border-radius: 30px;
         font-weight: bold;
-        background-color: #FF9800; /* 元気なオレンジ色 */
+        background-color: #FF9800;
         color: white;
         border: none;
     }
@@ -48,10 +48,12 @@ st.markdown("""
         color: white;
         background-color: #F57C00;
     }
-    /* 成功メッセージ */
-    .stToast {
-        font-size: 18px;
-        background-color: #E8F5E9;
+    /* 「小学校」という固定文字のスタイル調整 */
+    .school-suffix {
+        font-size: 20px;
+        font-weight: bold;
+        padding-top: 35px; /* 入力欄の高さに合わせる */
+        color: #333;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -77,7 +79,7 @@ def get_connection():
         st.error("システムエラー: 設定を確認してください")
         return None
 
-def fetch_user_data(school, grade, u_class, number):
+def fetch_user_data(school_full_name, grade, u_class, number):
     client = get_connection()
     if not client: return None, None, 0
 
@@ -85,8 +87,8 @@ def fetch_user_data(school, grade, u_class, number):
         sheet = client.open("decokatsu_db").sheet1
         records = sheet.get_all_records()
         
-        clean_school = school.strip()
-        user_id = f"{clean_school}_{grade}_{u_class}_{number}"
+        # ID作成：学校名 + 学年 + 組 + 番号
+        user_id = f"{school_full_name}_{grade}_{u_class}_{number}"
         
         total_co2 = 0
         nickname = ""
@@ -107,7 +109,6 @@ def fetch_user_data(school, grade, u_class, number):
         st.error(f"データ取得エラー: {e}")
         return None, None, 0
 
-# まとめて保存するように変更
 def save_daily_challenge(user_id, nickname, target_date, actions_done, total_points, memo):
     client = get_connection()
     if not client: return False
@@ -116,7 +117,6 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         sheet = client.open("decokatsu_db").sheet1
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # [送信日時, ID, ニックネーム, 対象日付, 実施項目(カンマ区切り), 合計CO2, 家族メモ]
         actions_str = ", ".join(actions_done)
         sheet.append_row([now, user_id, nickname, target_date, actions_str, total_points, memo])
         return True
@@ -140,34 +140,46 @@ def login_screen():
     st.info("学校名と、自分の「年・組・番号」を入れてね。")
 
     with st.form("login_form"):
-        school_input = st.text_input("小学校の名前", placeholder="例：倉敷小学校（毎回おなじ名前を入れてね）")
-        
+        # === 変更点1：小学校名を「〇〇」+「小学校(固定)」に分割 ===
+        st.markdown("**小学校の名前**")
+        col_sch1, col_sch2 = st.columns([3, 1])
+        with col_sch1:
+            school_core = st.text_input("小学校名（ラベルなし）", placeholder="例：倉敷", label_visibility="collapsed")
+        with col_sch2:
+            st.markdown('<div class="school-suffix">小学校</div>', unsafe_allow_html=True)
+
         col1, col2 = st.columns(2)
         with col1:
             grade = st.selectbox("学年", ["1年", "2年", "3年", "4年", "5年", "6年"])
-            u_class = st.number_input("組（クラス）", min_value=1, max_value=10, step=1)
+            
+            # === 変更点2：組を自由入力（テキスト）に変更 ===
+            u_class = st.text_input("組（クラス）", placeholder="例：1、A、松")
+            
         with col2:
             number = st.number_input("出席番号", min_value=1, max_value=50, step=1)
-            st.write("") 
-        
-        nickname_input = st.text_input("ニックネーム（ひらがな）", placeholder="例：たろう")
+            
+        # === 変更点3：ニックネーム例を変更 ===
+        nickname_input = st.text_input("ニックネーム（ひらがな）", placeholder="例：でこかつたろう")
 
         submit = st.form_submit_button("スタート！", type="primary")
 
         if submit:
-            if not school_input or not nickname_input:
-                st.warning("学校名とニックネームを入れてね！")
+            if not school_core or not nickname_input or not u_class:
+                st.warning("学校名、クラス、ニックネームを入れてね！")
                 return
 
             with st.spinner("データを読み込んでいます..."):
-                user_id, saved_name, total = fetch_user_data(school_input, grade, u_class, number)
+                # 入力された名前に「小学校」をくっつけて正式名称にする
+                full_school_name = f"{school_core}小学校"
+                
+                user_id, saved_name, total = fetch_user_data(full_school_name, grade, u_class, number)
                 final_name = saved_name if saved_name else nickname_input
                 
                 st.session_state.user_info = {
                     'id': user_id,
                     'name': final_name,
                     'total_co2': total,
-                    'school': school_input
+                    'school': full_school_name
                 }
                 st.rerun()
 
@@ -184,14 +196,11 @@ def main_screen():
     
     st.markdown("---")
     
-    # === デジタル・チャレンジシート部分 ===
+    # === デジタル・チャレンジシート ===
     st.header("📝 今日のチャレンジ")
     
-    # 1. 日付選択（タブではなくセレクトボックスでシンプルに）
-    # チラシに合わせて日付を用意
+    # 日付選択
     date_options = ["6/1 (土)", "6/2 (日)", "6/3 (月)", "6/4 (火)", "6/5 (水)", "6/6 (木)", "6/7 (日)"]
-    
-    # デフォルトで「今日」に近い日付を選ばせるロジック（簡易版）
     today_md = datetime.date.today().strftime("%-m/%-d")
     default_idx = 0
     for i, d in enumerate(date_options):
@@ -202,11 +211,8 @@ def main_screen():
     
     st.info(f"【{target_date}】 できたことにスイッチを入れよう！")
 
-    # 入力フォーム
     with st.form("challenge_form"):
-        # 2. チェック項目（チラシの①〜⑤）
-        # ONにすると「やった！」感が出るようにtoggleを使用
-        
+        # チェック項目（トグルスイッチ）
         check_1 = st.toggle("① 💡 電気を消した (+50g)", help="使っていない部屋の電気をこまめに消そう")
         check_2 = st.toggle("② 🍚 残さず食べた (+100g)", help="給食や晩ごはん、残さず食べたかな？")
         check_3 = st.toggle("③ 🚰 水を止めた (+30g)", help="歯磨きのとき、水を流しっぱなしにしてない？")
@@ -215,14 +221,12 @@ def main_screen():
         
         st.markdown("---")
         
-        # 3. 家族会議メモ（チラシ中段の内容）
         st.markdown("**🏡 家族で作戦会議！**")
         memo_input = st.text_area("地球のために、これから我が家でできること（任意）", height=80, placeholder="例：買い物のときはエコバッグを持つ！")
         
         submit_challenge = st.form_submit_button("✅ まとめて送信！")
         
         if submit_challenge:
-            # ポイント計算
             points = 0
             actions = []
             if check_1: 
@@ -254,7 +258,6 @@ def main_screen():
 
     st.markdown("---")
     
-    # === 完了・イベント案内 ===
     with st.expander("🎟 ガラポン参加証を表示する"):
         if user['total_co2'] > 0:
             st.success("会場の受付でこれを見せてね！")
