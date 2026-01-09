@@ -27,18 +27,7 @@ st.markdown("""
     html, body, [class*="css"] {
         font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     }
-    .stToggle {
-        background-color: #f0f8ff;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        border: 1px solid #dcdcdc;
-    }
-    .stToggle label {
-        font-size: 18px !important;
-        font-weight: bold;
-        color: #2e8b57;
-    }
+    /* 送信ボタンを目立たせる */
     .stButton>button {
         width: 100%;
         height: 70px;
@@ -59,6 +48,7 @@ st.markdown("""
         padding-top: 35px;
         color: #333;
     }
+    /* スペシャルミッション用 */
     .special-mission {
         background-color: #e0f7fa;
         padding: 20px;
@@ -96,7 +86,7 @@ def get_connection():
 
 def fetch_user_data(school_full_name, grade, u_class, number):
     client = get_connection()
-    if not client: return None, None, 0, []
+    if not client: return None, None, 0, {}
 
     try:
         sheet = client.open("decokatsu_db").sheet1
@@ -106,7 +96,8 @@ def fetch_user_data(school_full_name, grade, u_class, number):
         
         total_co2 = 0
         nickname = ""
-        history = []
+        # 履歴を辞書形式で管理 { "6/1 (月)": ["電気", "食事"], ... }
+        history_dict = {} 
         
         for row in records:
             if str(row.get('ID')) == user_id:
@@ -117,19 +108,19 @@ def fetch_user_data(school_full_name, grade, u_class, number):
                     pass
                 if row.get('ニックネーム'):
                     nickname = row.get('ニックネーム')
-                if row.get('対象日付') and row.get('実施項目'):
-                    history.append({
-                        'date': row.get('対象日付'),
-                        'actions': str(row.get('実施項目'))
-                    })
+                
+                # 履歴データを上書き更新（修正対応のため、同じ日付なら新しいデータが優先されるようにする）
+                r_date = row.get('対象日付')
+                r_actions = row.get('実施項目')
+                if r_date:
+                    history_dict[r_date] = str(r_actions).split(", ") if r_actions else []
         
-        return user_id, nickname, total_co2, history
+        return user_id, nickname, total_co2, history_dict
 
     except Exception as e:
         st.error(f"データ取得エラー: {e}")
-        return None, None, 0, []
+        return None, None, 0, {}
 
-# === 保存関数を拡張（Q1, Q2, Q3を受け取れるように変更） ===
 def save_daily_challenge(user_id, nickname, target_date, actions_done, total_points, memo, q1="", q2="", q3=""):
     client = get_connection()
     if not client: return False
@@ -139,8 +130,6 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         actions_str = ", ".join(actions_done)
         
-        # アンケート回答を独立した列に追加して保存
-        # [日時, ID, ニックネーム, 対象日付, 実施項目, CO2, メモ, Q1, Q2, Q3]
         sheet.append_row([now, user_id, nickname, target_date, actions_str, total_points, memo, q1, q2, q3])
         return True
     except Exception as e:
@@ -189,7 +178,8 @@ def login_screen():
             with st.spinner("データを読み込んでいます..."):
                 full_school_name = f"{school_core}小学校"
                 
-                user_id, saved_name, total, history = fetch_user_data(full_school_name, grade, u_class, number)
+                # history_dict を取得
+                user_id, saved_name, total, history_dict = fetch_user_data(full_school_name, grade, u_class, number)
                 final_name = saved_name if saved_name else nickname_input
                 
                 st.session_state.user_info = {
@@ -197,7 +187,7 @@ def login_screen():
                     'name': final_name,
                     'total_co2': total,
                     'school': full_school_name,
-                    'history': history
+                    'history_dict': history_dict
                 }
                 st.rerun()
 
@@ -212,99 +202,147 @@ def main_screen():
     st.progress(min(current / GOAL, 1.0))
     st.caption(f"現在のCO2削減パワー: **{current} g** / 目標 {GOAL} g")
     
+    st.markdown("---")
+
     # ==========================================
-    #  📊 チャレンジ一覧表
+    #  📊 チャレンジ入力表 (直接操作版)
     # ==========================================
-    st.markdown("### 📊 きみのチャレンジ記録")
+    st.markdown("### 📝 チャレンジ・チェック表")
+    st.info("やったことにチェックを入れて、「保存する」ボタンを押してね！後から修正もできるよ。")
     
     if not HAS_PANDAS:
-        st.warning("⚠️ 表を表示するには設定に 'pandas' を追加してください。")
+        st.warning("⚠️ 設定(requirements.txt)に 'pandas' を追加してください。")
     else:
-        target_dates_table = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
+        # 表の設定
+        target_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
         categories = ["電気", "食事", "水", "分別", "マイデコ"]
-        category_labels = {
-            "電気": "①電気", "食事": "②食事", "水": "③水　", "分別": "④分別", "マイデコ": "⑤デコ"
-        }
-
-        df = pd.DataFrame(index=[category_labels[c] for c in categories], columns=target_dates_table)
-        df = df.fillna("ー")
-
-        if user.get('history'):
-            for record in user['history']:
-                r_date = record['date']
-                r_actions = record['actions']
-                if r_date in target_dates_table:
-                    for cat in categories:
-                        if cat in r_actions:
-                            df.at[category_labels[cat], r_date] = "🟢"
         
-        st.table(df)
+        # 表示用のラベルと、保存用のキーワードの対応
+        cat_map = {
+            "① 💡 電気を消した": "電気",
+            "② 🍚 残さず食べた": "食事",
+            "③ 🚰 水を止めた": "水",
+            "④ ♻️ 正しく分けた": "分別",
+            "⑤ 🍴 マイ・デコ活": "マイデコ"
+        }
+        point_map = {"電気": 50, "食事": 100, "水": 30, "分別": 80, "マイデコ": 50}
+        
+        # データを整形 (行:アクション、列:日付)
+        # 初期値は False (チェックなし)
+        df_data = {date: [False]*len(categories) for date in target_dates}
+        
+        # 履歴データ(history_dict)があれば反映
+        history = user.get('history_dict', {})
+        for date_col in target_dates:
+            if date_col in history:
+                done_actions = history[date_col] # ["電気", "食事"] など
+                for i, cat in enumerate(categories):
+                    # cat_mapの値と比較
+                    if cat_map.get(list(cat_map.keys())[i]) in done_actions:
+                         df_data[date_col][i] = True
+
+        # DataFrame作成
+        df = pd.DataFrame(df_data, index=cat_map.keys())
+
+        # ★ ここがポイント：編集可能なデータフレームを表示 ★
+        edited_df = st.data_editor(
+            df,
+            column_config={
+                "6/1 (月)": st.column_config.CheckboxColumn("6/1 (月)", default=False),
+                "6/2 (火)": st.column_config.CheckboxColumn("6/2 (火)", default=False),
+                "6/3 (水)": st.column_config.CheckboxColumn("6/3 (水)", default=False),
+                "6/4 (木)": st.column_config.CheckboxColumn("6/4 (木)", default=False),
+            },
+            disabled=[], # 全セル編集可能
+            hide_index=False,
+            use_container_width=True
+        )
+
+        # 保存ボタン
+        if st.button("✅ チェックした内容を保存する", type="primary"):
+            with st.spinner("記録しています..."):
+                save_count = 0
+                total_new_points_session = 0
+                
+                # 編集されたDataFrameを走査して保存
+                # 日付ごとにループ
+                for date_col in target_dates:
+                    # その日の現在のチェック状況を取得
+                    current_checks = edited_df[date_col] # Series (True/False)
+                    
+                    # 実施項目リストを作成
+                    actions_to_save = []
+                    day_points = 0
+                    
+                    for idx, is_checked in current_checks.items():
+                        if is_checked:
+                            # インデックス名から短いキーワード(電気etc)に変換
+                            short_name = cat_map[idx]
+                            actions_to_save.append(short_name)
+                            day_points += point_map[short_name]
+                    
+                    # 変更があるか確認（サーバー負荷軽減のため）
+                    # 以前のデータと比較
+                    prev_actions = history.get(date_col, [])
+                    # 集合(set)にして比較すると順序関係なく一致確認できる
+                    if set(actions_to_save) != set(prev_actions):
+                        # 変更があるので保存（新しい行を追加＝上書き扱い）
+                        # CO2削減量は「その日の合計」ではなく「差分」で足すべきだが、
+                        # 簡易的に「その日の合計」をログに残し、表示側で最新行を採用するロジックにしているため
+                        # ここでは「その日の合計ポイント」を保存する。
+                        # ※ただし、合計CO2の計算は複雑になるため、今回は「ポイント加算」は表示上行わず
+                        # ログとして残すことに注力する（または差分計算する）
+                        
+                        # シンプル化: 今回の保存で得られるポイント - 前回までのポイント = 加算すべき差分
+                        prev_points = sum([point_map[a] for a in prev_actions if a in point_map])
+                        diff_points = day_points - prev_points
+                        
+                        save_daily_challenge(
+                            user['id'], user['name'], date_col, actions_to_save, diff_points, "一括更新"
+                        )
+                        total_new_points_session += diff_points
+                        save_count += 1
+                
+                if save_count > 0:
+                    # データを再取得して画面更新
+                    full_school_name = user['school']
+                    _, _, new_total, new_history_dict = fetch_user_data(full_school_name, "", "", "")
+                    
+                    st.session_state.user_info['total_co2'] = new_total
+                    st.session_state.user_info['history_dict'] = new_history_dict
+                    
+                    st.balloons()
+                    st.success(f"保存しました！ ポイント変動: {total_new_points_session}g")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.info("変更はありませんでした。")
 
     st.markdown("---")
     
     # ==========================================
-    #  📝 チャレンジ入力 / 6/5アンケート
+    #  6/5 スペシャルミッション（アンケート）
     # ==========================================
-    
-    all_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)", "6/5 (金)", "6/6 (土)", "6/7 (日)"]
-    today_md = datetime.date.today().strftime("%-m/%-d")
-    default_idx = 0
-    for i, d in enumerate(all_dates):
-        if today_md in d:
-            default_idx = i
-            
-    target_date = st.selectbox("📅 日付を選んでね", all_dates, index=default_idx)
-
-    # --- 🌟 6/5 環境の日 スペシャルミッション（アンケート） ---
-    if "6/5" in target_date:
-        st.markdown("""
-        <div class="special-mission">
-            <h2>🌿 環境の日 スペシャルミッション 🌿</h2>
-            <p>今日は環境の日！<br>6/1〜6/4までのチャレンジを振り返って、<br>アンケートに答えよう！</p>
-        </div>
-        """, unsafe_allow_html=True)
+    with st.expander("🌿 6/5 環境の日 スペシャルミッション（アンケート）", expanded=True):
+        st.write("6/5(金)になったら、ここに入力してね！")
         
         with st.form("special_mission_form"):
             st.markdown("### 📝 アンケート")
             
             q1 = st.radio(
                 "Q1. 5日間のチャレンジ、どれくらいできましたか？",
-                [
-                    "5：パーフェクト達成！",
-                    "4：よくできた！",
-                    "3：ふつう",
-                    "2：もう少し！",
-                    "1：チャレンジはした"
-                ]
+                ["5：パーフェクト達成！", "4：よくできた！", "3：ふつう", "2：もう少し！", "1：チャレンジはした"]
             )
-            st.write("")
-            
             q2 = st.radio(
                 "Q2. デコ活をやってみて、これからも続けたいですか？（必須）",
-                [
-                    "5：絶対つづける！",
-                    "4：つづけたい",
-                    "3：気がむいたらやる",
-                    "2：むずかしいかも",
-                    "1：もうやらない"
-                ]
+                ["5：絶対つづける！", "4：つづけたい", "3：気がむいたらやる", "2：むずかしいかも", "1：もうやらない"]
             )
-            st.write("")
-
             q3 = st.radio(
                 "Q3. おうちの人と「環境」や「エコ」について話しましたか？",
-                [
-                    "5：家族みんなでやった！",
-                    "4：たくさん話した",
-                    "3：少し話した",
-                    "2：あまり話していない",
-                    "1：全然話していない"
-                ]
+                ["5：家族みんなでやった！", "4：たくさん話した", "3：少し話した", "2：あまり話していない", "1：全然話していない"]
             )
             st.markdown("---")
-
-            st.markdown("**自由感想欄**")
-            feedback = st.text_area("感想や、これからがんばりたいことを書いてね！", height=100, placeholder="例：電気を消すのが習慣になった！家族とエコの話ができて楽しかった！")
+            feedback = st.text_area("感想や、これからがんばりたいこと", height=100)
             
             submit_special = st.form_submit_button("💌 アンケートを送ってポイントGET！")
             
@@ -313,68 +351,14 @@ def main_screen():
                     special_points = 100
                     actions = ["環境の日アンケート"]
                     
-                    # Q1, Q2, Q3 を個別の列として保存
-                    # (save_daily_challenge関数の引数に追加)
                     if save_daily_challenge(
-                        user_id=user['id'], 
-                        nickname=user['name'], 
-                        target_date=target_date, 
-                        actions_done=actions, 
-                        total_points=special_points, 
-                        memo=feedback, # 感想は「メモ」列へ
-                        q1=q1, # ここから新設列
-                        q2=q2, 
-                        q3=q3
+                        user['id'], user['name'], "6/5 (金)", actions, special_points, feedback, q1, q2, q3
                     ):
                         st.session_state.user_info['total_co2'] += special_points
                         st.balloons()
                         st.success(f"回答ありがとう！スペシャルボーナス {special_points}g ゲット！")
                         time.sleep(2)
                         st.rerun()
-
-    # --- 通常のチャレンジ入力 ---
-    else:
-        st.info(f"【{target_date}】 できたことにスイッチを入れよう！")
-
-        with st.form("challenge_form"):
-            check_1 = st.toggle("① 💡 電気を消した (+50g)")
-            check_2 = st.toggle("② 🍚 残さず食べた (+100g)")
-            check_3 = st.toggle("③ 🚰 水を止めた (+30g)")
-            check_4 = st.toggle("④ ♻️ 正しく分けた (+80g)")
-            check_5 = st.toggle("⑤ 🍴 マイ・デコ活 (+50g)")
-            
-            st.markdown("---")
-            memo_input = st.text_area("🏡 家族で作戦会議（メモ）", height=80, placeholder="例：家族みんなで早寝早起き！")
-            
-            submit_challenge = st.form_submit_button("✅ まとめて送信！")
-            
-            if submit_challenge:
-                points = 0
-                actions = []
-                if check_1: points += 50; actions.append("電気")
-                if check_2: points += 100; actions.append("食事")
-                if check_3: points += 30; actions.append("水")
-                if check_4: points += 80; actions.append("分別")
-                if check_5: points += 50; actions.append("マイデコ")
-                
-                if points == 0 and not memo_input:
-                    st.warning("チェックを入れてね！")
-                else:
-                    with st.spinner("記録しています..."):
-                        # 通常時は Q1-Q3 は空欄で保存
-                        if save_daily_challenge(user['id'], user['name'], target_date, actions, points, memo_input):
-                            full_school_name = user['school']
-                            _, _, new_total, new_history = fetch_user_data(full_school_name, "", "", "")
-                            st.session_state.user_info['total_co2'] += points
-                            st.session_state.user_info['history'].append({
-                                'date': target_date,
-                                'actions': ",".join(actions)
-                            })
-                            
-                            st.balloons()
-                            st.success(f"{points}g ゲット！表が更新されたよ！")
-                            time.sleep(2)
-                            st.rerun()
 
     st.markdown("---")
     
