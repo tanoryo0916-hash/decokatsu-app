@@ -213,7 +213,7 @@ st.markdown("""
 
     /* --- ⚽ サッカーボール換算 --- */
     .soccer-visual {
-        background-color: #E8F5E9; /* 芝生っぽい薄緑 */
+        background-color: #E8F5E9;
         border: 2px dashed #66BB6A;
         border-radius: 15px;
         padding: 15px;
@@ -230,6 +230,21 @@ st.markdown("""
         font-size: 24px;
         font-weight: 900;
         color: #1B5E20;
+    }
+
+    /* --- 📌 ログイン注意事項ボックス --- */
+    .login-guide {
+        background-color: #FFEBEE; /* 薄い赤/ピンク */
+        border: 2px solid #FFCDD2;
+        border-radius: 15px;
+        padding: 15px;
+        margin-bottom: 20px;
+        color: #B71C1C;
+        font-size: 14px;
+    }
+    .login-guide strong {
+        color: #D32F2F;
+        font-weight: 900;
     }
 
     /* --- ℹ️ ミッション説明ボックス --- */
@@ -693,7 +708,16 @@ def login_screen():
         """, unsafe_allow_html=True)
     
     st.markdown("### 🏫 ヒーロー登録（ログイン）")
-    st.info("学校名と、自分の「年・組・番号」を入れてスタート！")
+    
+    # === ★ ログイン注意事項（ブックマーク案内） ===
+    st.markdown("""
+    <div class="login-guide">
+        <strong>📌 わすれないでね！</strong><br>
+        ① つづきから するときは、いつも <strong>おなじ「学年・組・番号」</strong> を いれてね。<br>
+        ② この ページを <strong>「ブックマーク（お気に入り）」</strong> して、また すぐ これるように してね！
+    </div>
+    """, unsafe_allow_html=True)
+    # ============================================
 
     with st.form("login_form"):
         st.markdown("**小学校の名前**")
