@@ -58,12 +58,11 @@ st.markdown("""
     }
 
     /* --- 🏫 ログインフォームのカード化 --- */
-    /* フォーム周りを囲むコンテナ風スタイル（擬似的） */
     div[data-testid="stForm"] {
         background-color: #ffffff;
         padding: 30px;
         border-radius: 20px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.08); /* 柔らかい影 */
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
         border: 2px solid #FFF3E0;
     }
 
@@ -74,7 +73,6 @@ st.markdown("""
         border: 2px solid #EEEEEE;
         transition: border-color 0.3s;
     }
-    /* フォーカス時の色 */
     div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
         border-color: #FF9800;
         background-color: #fff;
@@ -100,7 +98,6 @@ st.markdown("""
         position: relative;
         overflow: hidden;
     }
-    /* キラキラ演出（疑似要素） */
     .hero-card::before {
         content: "";
         position: absolute;
@@ -144,7 +141,7 @@ st.markdown("""
         padding: 0 5px;
     }
     .stat-num {
-        color: #FFD700; /* ゴールド */
+        color: #FFD700;
         font-size: 32px;
         font-weight: 900;
         margin: 0;
@@ -181,31 +178,21 @@ st.markdown("""
     /* --- 📈 メーターコンテナ --- */
     .metric-container {
         padding: 15px;
-        background-color: #F1F8E9; /* 薄い緑 */
+        background-color: #F1F8E9;
         border-radius: 15px;
         border: 2px solid #C5E1A5;
         text-align: center;
         margin-bottom: 10px;
     }
 
-    /* --- 🍑 タイトルデザイン --- */
+    /* --- 🍑 タイトルデザイン（メイン画面用） --- */
     .main-title {
         text-align: center;
-        font-size: 36px;
+        font-size: 32px;
         font-weight: 900;
-        background: -webkit-linear-gradient(0deg, #FF9800, #F06292);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 5px;
-        filter: drop-shadow(2px 2px 0px rgba(0,0,0,0.1));
-    }
-    .sub-title {
-        text-align: center;
-        font-size: 16px;
-        font-weight: bold;
-        color: #78909C;
-        margin-bottom: 25px;
-        letter-spacing: 1px;
+        color: #2E7D32;
+        margin-bottom: 20px;
+        text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 2px 2px 0 rgba(0,0,0,0.1);
     }
 
     /* --- 🦶 フッター --- */
@@ -271,7 +258,7 @@ st.markdown("""
     button[data-baseweb="tab"] {
         background-color: #FFF3E0;
         border: 1px solid #FFE0B2;
-        border-radius: 20px 20px 0 0; /* 丸みをつける */
+        border-radius: 20px 20px 0 0;
         font-weight: bold;
         color: #EF6C00;
         padding: 12px 10px;
@@ -280,7 +267,7 @@ st.markdown("""
     }
     button[data-baseweb="tab"]:hover {
         background-color: #FFE0B2;
-        padding-top: 10px; /* ちょっと動く */
+        padding-top: 10px;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
         background-color: #FF9800 !important;
@@ -295,7 +282,6 @@ st.markdown("""
 #  2. データ定義（岡山弁＆トリビア）
 # ==========================================
 
-# 🍑 岡山弁の褒め言葉リスト
 OKAYAMA_PRAISE_LIST = [
     "ぼっけぇ すごいが！",
     "でーれー がんばったな！",
@@ -306,7 +292,6 @@ OKAYAMA_PRAISE_LIST = [
     "明（あ）したも がんばられー！"
 ]
 
-# 💡 エコトリビアリスト
 ECO_TRIVIA_LIST = [
     "シャワーを 1分（ぷん） とめるだけで、ペットボトル 200本（ぽん）ぶんの 水（みず）が せつやく できるんで！",
     "テレビを 1時間（じかん） けすと、風船（ふうせん） 400個（こ）ぶんの CO2（シーオーツー）が へらせるんよ。",
@@ -454,11 +439,54 @@ if 'user_info' not in st.session_state:
 # ==========================================
 
 def login_screen():
-    st.image("https://placehold.jp/3d4070/ffffff/800x200.png?text=Okayama%20Decokatsu%20Challenge", use_column_width=True)
-    
-    st.markdown('<div class="main-title">🍑 おかやまデコ活チャレンジ</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
+    # --- おしゃれなカスタムヘッダー ---
+    # 背景画像は、岡山の風景や自然をイメージしたフリー素材のURLを使用（デモ用）
+    header_bg_url = "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
 
+    st.markdown(f"""
+    <style>
+        .custom-header {{
+            background-image: linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.3)), url('{header_bg_url}');
+            background-size: cover;
+            background-position: center;
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            border-radius: 0 0 25px 25px;
+            margin-bottom: 35px;
+            color: white;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+        }}
+        .header-title-main {{
+            font-size: 42px;
+            font-weight: 900;
+            margin: 0;
+            padding: 0;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.6);
+            letter-spacing: 2px;
+        }}
+        .header-title-sub {{
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 15px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+            background-color: rgba(255, 152, 0, 0.9);
+            padding: 8px 20px;
+            border-radius: 30px;
+            display: inline-block;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }}
+    </style>
+    <div class="custom-header">
+        <div class="header-title-main">🍑 おかやまデコ活チャレンジ</div>
+        <div class="header-title-sub">目指せ！岡山県で10,000人のエコヒーロー！</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # === ★ デコ活説明コーナー ===
     with st.expander("🔰 最初のミッション：おうちの人と「デコ活」を知ろう！（ここをクリック）", expanded=False):
         
         st.markdown("""
