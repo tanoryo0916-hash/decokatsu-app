@@ -191,6 +191,27 @@ st.markdown("""
         font-size: 14px;
         margin-top: 10px;
     }
+    /* === 追加：タブのデザインをカスタマイズして目立たせる === */
+    div[data-baseweb="tab-list"] {
+        gap: 5px;
+    }
+    button[data-baseweb="tab"] {
+        background-color: #FFE0B2; /* 薄いオレンジ */
+        border: 1px solid #FFCC80;
+        border-radius: 5px 5px 0 0;
+        font-weight: bold;
+        color: #E65100;
+        padding: 10px 15px;
+        font-size: 16px;
+    }
+    button[data-baseweb="tab"]:hover {
+        background-color: #FFCC80;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #FF9800 !important; /* 選択中は濃いオレンジ */
+        color: white !important;
+        border: none;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -330,7 +351,8 @@ def login_screen():
     st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
 
     # === ★ デコ活説明コーナー（親子で学ぶフロー） ===
-    with st.expander("❓ さいしょのミッション：おうちの人に聞いてみよう！（ここをクリック）", expanded=True):
+    # expanded=False に変更して、最初は閉じた状態にする
+    with st.expander("❓ さいしょのミッション：おうちの人に聞いてみよう！（ここをクリック）", expanded=False):
         
         st.markdown("""
         <div class="kids-action">
@@ -370,6 +392,7 @@ def login_screen():
         </div>
         """, unsafe_allow_html=True)
         
+        # ★ タブ表示（CSSでデザイン強調済み）
         tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 全体のまとめ", "🏡 毎日の生活", "🍚 食べ物", "💡 家電・暮らし", "👕 服・ファッション"])
         
         with tab1:
@@ -412,7 +435,7 @@ def login_screen():
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # --- STEP 3 (NEW) ---
+        # --- STEP 3 ---
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 3： 未来はどうなるの？</div>
