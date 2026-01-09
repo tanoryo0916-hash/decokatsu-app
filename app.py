@@ -5,6 +5,7 @@ from google.oauth2.service_account import Credentials
 import time
 import os
 import base64
+import random  # ランダム表示用に追加
 
 # --- 真っ白画面回避のための安全策 ---
 try:
@@ -191,12 +192,12 @@ st.markdown("""
         font-size: 14px;
         margin-top: 10px;
     }
-    /* === 追加：タブのデザインをカスタマイズして目立たせる === */
+    /* タブデザイン */
     div[data-baseweb="tab-list"] {
         gap: 5px;
     }
     button[data-baseweb="tab"] {
-        background-color: #FFE0B2; /* 薄いオレンジ */
+        background-color: #FFE0B2;
         border: 1px solid #FFCC80;
         border-radius: 5px 5px 0 0;
         font-weight: bold;
@@ -208,7 +209,7 @@ st.markdown("""
         background-color: #FFCC80;
     }
     button[data-baseweb="tab"][aria-selected="true"] {
-        background-color: #FF9800 !important; /* 選択中は濃いオレンジ */
+        background-color: #FF9800 !important;
         color: white !important;
         border: none;
     }
@@ -216,7 +217,33 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-#  2. Google Sheets 接続設定
+#  2. データ定義（岡山弁＆トリビア）
+# ==========================================
+
+# 🍑 岡山弁の褒め言葉リスト
+OKAYAMA_PRAISE_LIST = [
+    "ぼっけぇ すごいが！",
+    "でーれー がんばったな！",
+    "さすがじゃ！ そのちょうし！",
+    "おめぇは ほんまに えらい！",
+    "地球（ちきゅう）が よろこびょーるで！",
+    "すごいが！ ヒーローじゃな！",
+    "明（あ）したも がんばられー！"
+]
+
+# 💡 エコトリビアリスト
+ECO_TRIVIA_LIST = [
+    "シャワーを 1分（ぷん） とめるだけで、ペットボトル 200本（ぽん）ぶんの 水（みず）が せつやく できるんで！",
+    "テレビを 1時間（じかん） けすと、風船（ふうせん） 400個（こ）ぶんの CO2（シーオーツー）が へらせるんよ。",
+    "岡山県（おかやまけん）は 「晴（は）れの国（くに）」 じゃけど、 水（みず）は とっても 大切（たいせつ）なんよ。",
+    "ごはんを のこさず 食べると、ゴミも へるし 体（からだ）も 元気（げんき）に なるで！",
+    "冷房（れいぼう）の 温度（おんど）を 1℃（ど） かえるだけで、電気（でんき）代（だい）が 安（やす）く なるんよ。",
+    "リサイクル できない ゴミを もやすと、たくさんの CO2（シーオーツー）が でてしまうんよ。",
+    "近（ちか）くの お店（みせ）には、車（くるま）じゃなくて 歩（ある）いていくのが かっこいい！"
+]
+
+# ==========================================
+#  3. Google Sheets 接続設定
 # ==========================================
 SCOPE = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -236,7 +263,15 @@ def get_connection():
         st.error("システムエラー: 設定(Secrets)を確認してください")
         return None
 
-# ★ 全体集計
+def display_pdf(file_path):
+    try:
+        with open(file_path, "rb") as f:
+            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
+        st.markdown(pdf_display, unsafe_allow_html=True)
+    except Exception as e:
+        st.error(f"PDF表示エラー: {e}")
+
 @st.cache_data(ttl=60)
 def fetch_global_stats():
     client = get_connection()
@@ -312,7 +347,6 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         st.error(f"保存失敗: {e}")
         return False
 
-# ★ フッター表示関数
 def show_footer():
     st.markdown("""
     <div class="footer-container">
@@ -335,13 +369,13 @@ def show_footer():
     """, unsafe_allow_html=True)
 
 # ==========================================
-#  3. セッション管理
+#  4. セッション管理
 # ==========================================
 if 'user_info' not in st.session_state:
     st.session_state.user_info = None
 
 # ==========================================
-#  4. 画面コンポーネント
+#  5. 画面コンポーネント
 # ==========================================
 
 def login_screen():
@@ -350,8 +384,6 @@ def login_screen():
     st.markdown('<div class="main-title">🍑 おかやまデコ活チャレンジ</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
 
-    # === ★ デコ活説明コーナー（親子で学ぶフロー） ===
-    # expanded=False に変更して、最初は閉じた状態にする
     with st.expander("❓ さいしょのミッション：おうちの人に聞いてみよう！（ここをクリック）", expanded=False):
         
         st.markdown("""
@@ -360,7 +392,6 @@ def login_screen():
         </div>
         """, unsafe_allow_html=True)
 
-        # --- STEP 1 ---
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 1： 「デコ活」ってなあに？</div>
@@ -380,11 +411,9 @@ def login_screen():
             「この蝶々のマークはね、<strong>みんなの小さな良いこと（エコ）が、地球を救う大きな風になる</strong>っていう意味なんだよ。<br>
             君がスイッチをパチンと消すだけで、地球にとっても良いことがあるんだよ！」
         </div>
+        <br>
         """, unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
 
-        # --- STEP 2 ---
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 2： なにをすればいいの？</div>
@@ -392,35 +421,29 @@ def login_screen():
         </div>
         """, unsafe_allow_html=True)
         
-        # ★ タブ表示（CSSでデザイン強調済み）
         tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 全体のまとめ", "🏡 毎日の生活", "🍚 食べ物", "💡 家電・暮らし", "👕 服・ファッション"])
         
         with tab1:
-            st.write("▼ 「デ・コ・カ・ツ」の合言葉！")
             img_sum = "decokatsu_panel_ver03_page-0002.jpg"
             if os.path.exists(img_sum):
                 st.image(img_sum, use_column_width=True, caption="出典：環境省")
         
         with tab2:
-            st.write("▼ 電気や水を大切にしよう！")
             img_daily = "deco_poster_action_ver_03_page-0001.jpg"
             if os.path.exists(img_daily):
                 st.image(img_daily, use_column_width=True, caption="出典：環境省")
         
         with tab3:
-            st.write("▼ 残さず食べよう！地元の野菜を食べよう！")
             img_food = "deco_poster_action_ver_02_page-0001.jpg"
             if os.path.exists(img_food):
                 st.image(img_food, use_column_width=True, caption="出典：環境省")
         
         with tab4:
-            st.write("▼ 省エネ家電やLEDで地球に優しく！")
             img_home = "deco_poster_action_ver_05_page-0001.jpg"
             if os.path.exists(img_home):
                 st.image(img_home, use_column_width=True, caption="出典：環境省")
 
         with tab5:
-            st.write("▼ 服を長く大切に着よう！")
             img_fashion = "deco_poster_action_ver_01_page-0001.jpg"
             if os.path.exists(img_fashion):
                 st.image(img_fashion, use_column_width=True, caption="出典：環境省")
@@ -431,11 +454,9 @@ def login_screen():
             このアプリのチェックリストにある「電気・食事・水・ゴミ」のアクションは、これらのポスターの内容を小学生向けにピックアップしたものです。<br>
             ぜひポスターを見ながら、「うちではこれができそうだね！」と話し合ってみてください。
         </div>
+        <br>
         """, unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # --- STEP 3 ---
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 3： 未来はどうなるの？</div>
@@ -456,7 +477,6 @@ def login_screen():
             みんなが笑顔になれる未来を目指そうね。」
         </div>
         """, unsafe_allow_html=True)
-    # ==============================================
 
     if HAS_PANDAS:
         g_co2, g_heroes, g_participants = fetch_global_stats()
@@ -511,7 +531,7 @@ def login_screen():
             
         nickname_input = st.text_input("ニックネーム（ひらがな）", placeholder="例：でこかつたろう")
 
-        submit = st.form_submit_button("ミッションスタート！", type="primary")
+        submit = st.form_submit_button("ミッション スタート！", type="primary")
 
         if submit:
             if not school_core or not nickname_input or not u_class:
@@ -587,36 +607,37 @@ def main_screen():
     st.markdown("---")
 
     st.markdown("### 📝 チャレンジ・チェック表")
-    st.info("やったことにチェックを入れて、「保存する」ボタンを押してね！")
+    st.info("やったことにチェックを入れて、「ほぞん する」ボタンを押してね！")
     
     if not HAS_PANDAS:
         st.warning("⚠️ 設定(requirements.txt)に 'pandas' を追加してください。")
     else:
         target_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
         
+        # --- ひらがな対応アクション定義 ---
         action_master = {
             "電気": {
-                "label": "① 💡 だれもいない部屋の電気を消した！",
+                "label": "① 💡 だれもいない へやの でんき をけした！",
                 "point": 50,
                 "help": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"
             },
             "食事": {
-                "label": "② 🍚 ごはんをのこさず食べた！",
+                "label": "② 🍚 ごはんを のこさず たべた！",
                 "point": 100,
                 "help": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"
             },
             "水": {
-                "label": "③ 🚰 水を大切に使った！",
+                "label": "③ 🚰 水（みず）を 大切（たいせつ）に つかった！",
                 "point": 30,
                 "help": "例：歯みがきの間コップを使って水を止めた、顔を洗うとき出しっぱなしにしなかった（CO2削減 -30g）"
             },
             "分別": {
-                "label": "④ ♻️ ゴミを正しく分けた！",
+                "label": "④ ♻️ ゴミを 正（ただ）しく わけた！",
                 "point": 80,
                 "help": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"
             },
             "家族": {
-                "label": "⑤ 👨‍👩‍👧 おうちの人も１つ以上できた！",
+                "label": "⑤ 👨‍👩‍👧 おうちの 人（ひと）も いっしょに できた！",
                 "point": 50,
                 "help": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"
             }
@@ -651,13 +672,13 @@ def main_screen():
             use_container_width=True
         )
         
-        with st.expander("❓ アクションの詳しい例を見る"):
+        with st.expander("❓ アクションの 詳しい例を みる"):
             for k, v in action_master.items():
                 st.markdown(f"**{v['label']}**")
                 st.caption(f"👉 {v['help']}")
                 st.write("")
 
-        if st.button("✅ チェックした内容を保存する", type="primary"):
+        if st.button("✅ チェックした 内容（ないよう）を ほぞん する", type="primary"):
             with st.spinner("記録しています..."):
                 save_count = 0
                 total_new_points_session = 0
@@ -691,9 +712,20 @@ def main_screen():
                 if save_count > 0:
                     st.session_state.user_info['history_dict'] = current_history
                     st.session_state.user_info['total_co2'] += total_new_points_session
-                    st.success(f"保存しました！ ポイント変動: {total_new_points_session}g")
-                    time.sleep(1)
+                    
+                    # 🍑 岡山弁メッセージ
+                    praise_msg = random.choice(OKAYAMA_PRAISE_LIST)
+                    st.success(f"{praise_msg}\n（ポイント変動: {total_new_points_session}g）")
+                    
+                    # 💡 日替わりトリビア
+                    trivia_msg = random.choice(ECO_TRIVIA_LIST)
+                    st.info(f"💡 **きょうの まめちしき**\n\n{trivia_msg}")
+                    
+                    st.balloons()
+                    time.sleep(4) # 読む時間を少し確保
                     st.rerun()
+                else:
+                    st.info("変更はありませんでした。")
 
     st.markdown("---")
     
