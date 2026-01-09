@@ -47,24 +47,7 @@ st.markdown("""
         padding-top: 35px;
         color: #333;
     }
-    .special-mission {
-        background-color: #e0f7fa;
-        padding: 20px;
-        border-radius: 15px;
-        border: 2px dashed #00bcd4;
-        text-align: center;
-        margin-bottom: 20px;
-    }
-    .stRadio label {
-        font-size: 16px !important;
-    }
-    .metric-container {
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        border: 1px solid #ddd;
-        text-align: center;
-    }
+    /* ヒーローカード */
     .hero-card {
         background: linear-gradient(135deg, #FFD700, #FFEB3B);
         border: 4px solid #FFA000;
@@ -88,7 +71,7 @@ st.markdown("""
         display: inline-block;
         margin: 10px 0;
     }
-    /* ログイン画面の集計表示用 */
+    /* ログイン画面の集計表示 */
     .global-stats {
         background-color: #263238;
         color: white;
@@ -104,7 +87,7 @@ st.markdown("""
     }
     .stat-num {
         color: #FFD700;
-        font-size: 28px; /* スマホで3列並ぶよう少し調整 */
+        font-size: 28px;
         font-weight: bold;
         margin: 0;
     }
@@ -112,6 +95,13 @@ st.markdown("""
         font-size: 12px;
         margin: 0;
         opacity: 0.8;
+    }
+    .metric-container {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        border: 1px solid #ddd;
+        text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -137,7 +127,7 @@ def get_connection():
         st.error("システムエラー: 設定(Secrets)を確認してください")
         return None
 
-# ★ 修正: 参加者数、ヒーロー数、CO2の3つを集計
+# ★ 全体集計
 @st.cache_data(ttl=60)
 def fetch_global_stats():
     client = get_connection()
@@ -150,13 +140,9 @@ def fetch_global_stats():
             if not data: return 0, 0, 0
             df = pd.DataFrame(data)
             
-            # 1. CO2合計
             total_co2 = pd.to_numeric(df['CO2削減量'], errors='coerce').sum()
-            
-            # 2. 全参加者数（IDのユニーク数）
             total_participants = df['ID'].nunique()
-
-            # 3. ヒーロー数（特別ミッション達成者）
+            
             hero_df = df[df['実施項目'].astype(str).str.contains("環境の日アンケート", na=False)]
             total_heroes = hero_df['ID'].nunique()
             
@@ -211,7 +197,6 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         actions_str = ", ".join(actions_done)
         
         sheet.append_row([now, user_id, nickname, target_date, actions_str, total_points, memo, q1, q2, q3])
-        # キャッシュクリア
         fetch_global_stats.clear()
         return True
     except Exception as e:
@@ -229,7 +214,6 @@ if 'user_info' not in st.session_state:
 # ==========================================
 
 def login_screen():
-    # --- 全体集計データの表示エリア（3カラム表示） ---
     if HAS_PANDAS:
         g_co2, g_heroes, g_participants = fetch_global_stats()
         
@@ -323,7 +307,8 @@ def main_screen():
 
     # --- メーター表示 ---
     GOAL = 500
-    MAX_POSSIBLE = 1340 
+    # 5項目(310g) * 4日 = 1240g + ボーナス100g = 1340g
+    MAX_POSSIBLE = 1340
     current = user['total_co2']
     progress_val = min(current / MAX_POSSIBLE, 1.0)
     
@@ -350,7 +335,7 @@ def main_screen():
     st.markdown("---")
 
     # ==========================================
-    #  📊 チャレンジ入力表
+    #  📊 チャレンジ入力表 (項目5修正版)
     # ==========================================
     st.markdown("### 📝 チャレンジ・チェック表")
     st.info("やったことにチェックを入れて、「保存する」ボタンを押してね！")
@@ -359,14 +344,39 @@ def main_screen():
         st.warning("⚠️ 設定(requirements.txt)に 'pandas' を追加してください。")
     else:
         target_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
-        categories = ["電気", "食事", "水", "分別", "マイデコ"]
         
-        cat_map = {
-            "① 💡 電気を消した": "電気", "② 🍚 残さず食べた": "食事",
-            "③ 🚰 水を止めた": "水", "④ ♻️ 正しく分けた": "分別",
-            "⑤ 🍴 マイ・デコ活": "マイデコ"
+        # --- アクション定義（全5項目） ---
+        action_master = {
+            "電気": {
+                "label": "① 💡 だれもいない部屋の電気を消した！",
+                "point": 50,
+                "help": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"
+            },
+            "食事": {
+                "label": "② 🍚 ごはんをのこさず食べた！",
+                "point": 100,
+                "help": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"
+            },
+            "水": {
+                "label": "③ 🚰 水を大切に使った！",
+                "point": 30,
+                "help": "例：歯みがきの間コップを使って水を止めた、顔を洗うとき出しっぱなしにしなかった（CO2削減 -30g）"
+            },
+            "分別": {
+                "label": "④ ♻️ ゴミを正しく分けた！",
+                "point": 80,
+                "help": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"
+            },
+            # === 変更箇所：5つ目を家族の実施項目へ ===
+            "家族": {
+                "label": "⑤ 👨‍👩‍👧 おうちの人も１つ以上できた！",
+                "point": 50,
+                "help": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"
+            }
         }
-        point_map = {"電気": 50, "食事": 100, "水": 30, "分別": 80, "マイデコ": 50}
+        
+        label_to_key = {v["label"]: k for k, v in action_master.items()}
+        categories = list(action_master.keys())
         
         df_data = {date: [False]*len(categories) for date in target_dates}
         history = user.get('history_dict', {})
@@ -374,11 +384,12 @@ def main_screen():
         for date_col in target_dates:
             if date_col in history:
                 done_actions = history[date_col]
-                for i, cat in enumerate(categories):
-                    if cat_map.get(list(cat_map.keys())[i]) in done_actions:
+                for i, key in enumerate(categories):
+                    if key in done_actions:
                          df_data[date_col][i] = True
 
-        df = pd.DataFrame(df_data, index=cat_map.keys())
+        display_labels = [action_master[k]["label"] for k in categories]
+        df = pd.DataFrame(df_data, index=display_labels)
 
         edited_df = st.data_editor(
             df,
@@ -392,6 +403,12 @@ def main_screen():
             hide_index=False,
             use_container_width=True
         )
+        
+        with st.expander("❓ アクションの詳しい例を見る"):
+            for k, v in action_master.items():
+                st.markdown(f"**{v['label']}**")
+                st.caption(f"👉 {v['help']}")
+                st.write("")
 
         if st.button("✅ チェックした内容を保存する", type="primary"):
             with st.spinner("記録しています..."):
@@ -404,16 +421,21 @@ def main_screen():
                     actions_to_save = []
                     day_points = 0
                     
-                    for idx, is_checked in current_checks.items():
+                    for label, is_checked in current_checks.items():
                         if is_checked:
-                            short_name = cat_map[idx]
-                            actions_to_save.append(short_name)
-                            day_points += point_map[short_name]
+                            key = label_to_key[label]
+                            actions_to_save.append(key)
+                            day_points += action_master[key]["point"]
                     
                     prev_actions = current_history.get(date_col, [])
                     if set(actions_to_save) != set(prev_actions):
-                        prev_points = sum([point_map[a] for a in prev_actions if a in point_map])
+                        prev_points = 0
+                        for a in prev_actions:
+                             if a in action_master:
+                                 prev_points += action_master[a]["point"]
+                        
                         diff_points = day_points - prev_points
+                        
                         save_daily_challenge(user['id'], user['name'], date_col, actions_to_save, diff_points, "一括更新")
                         total_new_points_session += diff_points
                         save_count += 1
