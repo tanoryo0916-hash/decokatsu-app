@@ -24,194 +24,269 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定 ---
+# --- CSS設定（おしゃれ＆軽量化） ---
 st.markdown("""
 <style>
+    /* 全体のフォント設定 */
     html, body, [class*="css"] {
         font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+        color: #333;
     }
+
+    /* --- 🍑 ボタンのデザイン（グラデーション＆浮き上がり） --- */
     .stButton>button {
         width: 100%;
         height: 70px;
-        font-size: 20px !important;
-        border-radius: 30px;
-        font-weight: bold;
-        background-color: #FF9800;
-        color: white;
+        font-size: 22px !important;
+        border-radius: 35px;
+        font-weight: 900;
         border: none;
+        color: white;
+        background: linear-gradient(135deg, #FF9800 0%, #FF5722 100%);
+        box-shadow: 0 4px 15px rgba(255, 87, 34, 0.4);
+        transition: all 0.3s ease;
+        letter-spacing: 1px;
     }
     .stButton>button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 20px rgba(255, 87, 34, 0.6);
         color: white;
-        background-color: #F57C00;
     }
+    .stButton>button:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 10px rgba(255, 87, 34, 0.4);
+    }
+
+    /* --- 🏫 ログインフォームのカード化 --- */
+    /* フォーム周りを囲むコンテナ風スタイル（擬似的） */
+    div[data-testid="stForm"] {
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08); /* 柔らかい影 */
+        border: 2px solid #FFF3E0;
+    }
+
+    /* 入力フィールドのデザイン */
+    div[data-baseweb="input"], div[data-baseweb="select"] {
+        border-radius: 12px;
+        background-color: #FAFAFA;
+        border: 2px solid #EEEEEE;
+        transition: border-color 0.3s;
+    }
+    /* フォーカス時の色 */
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+        border-color: #FF9800;
+        background-color: #fff;
+    }
+
     .school-suffix {
-        font-size: 20px;
+        font-size: 18px;
         font-weight: bold;
         padding-top: 35px;
-        color: #333;
+        color: #555;
     }
-    /* ヒーローカード */
+
+    /* --- 🏆 ヒーローカード（認定証） --- */
     .hero-card {
-        background: linear-gradient(135deg, #FFD700, #FFEB3B);
+        background: linear-gradient(135deg, #FFD54F, #FFECB3);
         border: 4px solid #FFA000;
-        border-radius: 15px;
-        padding: 20px;
+        border-radius: 20px;
+        padding: 25px;
         text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        margin-bottom: 25px;
+        box-shadow: 0 8px 16px rgba(0,0,0,0.15);
         color: #5D4037;
+        position: relative;
+        overflow: hidden;
+    }
+    /* キラキラ演出（疑似要素） */
+    .hero-card::before {
+        content: "";
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 60%);
+        transform: rotate(30deg);
+        opacity: 0.3;
+        pointer-events: none;
     }
     .hero-title {
-        font-size: 24px;
+        font-size: 26px;
         font-weight: bold;
         margin-bottom: 10px;
-        text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        text-shadow: 1px 1px 0px rgba(255,255,255,0.8);
+        color: #E65100;
     }
     .hero-name {
-        font-size: 30px;
+        font-size: 32px;
         font-weight: 900;
-        border-bottom: 2px solid #5D4037;
+        border-bottom: 3px dashed #5D4037;
         display: inline-block;
-        margin: 10px 0;
+        margin: 15px 0;
+        padding-bottom: 5px;
     }
-    /* ログイン画面の集計表示 */
+
+    /* --- 📊 グローバル集計ボード --- */
     .global-stats {
-        background-color: #263238;
+        background: linear-gradient(145deg, #263238, #37474F);
         color: white;
-        padding: 15px;
-        border-radius: 10px;
+        padding: 20px;
+        border-radius: 15px;
         text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        margin-bottom: 25px;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.2);
     }
     .stat-box {
         flex: 1;
         padding: 0 5px;
     }
     .stat-num {
-        color: #FFD700;
-        font-size: 28px;
-        font-weight: bold;
+        color: #FFD700; /* ゴールド */
+        font-size: 32px;
+        font-weight: 900;
         margin: 0;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
     .stat-label {
-        font-size: 12px;
+        font-size: 13px;
         margin: 0;
-        opacity: 0.8;
+        opacity: 0.9;
+        font-weight: bold;
+        color: #CFD8DC;
     }
-    /* ログイン画面のミッション説明ボックス */
+
+    /* --- ℹ️ ミッション説明ボックス --- */
     .mission-box {
-        background-color: #FFF3E0;
-        border: 2px solid #FFB74D;
-        border-radius: 15px;
-        padding: 20px;
+        background-color: #FFF8E1;
+        border-left: 6px solid #FFAB00;
+        border-radius: 8px;
+        padding: 15px 20px;
         margin-bottom: 20px;
         color: #333;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
     .mission-header {
         font-size: 20px;
         font-weight: bold;
         color: #E65100;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
     }
+
+    /* --- 📈 メーターコンテナ --- */
     .metric-container {
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        border: 1px solid #ddd;
+        padding: 15px;
+        background-color: #F1F8E9; /* 薄い緑 */
+        border-radius: 15px;
+        border: 2px solid #C5E1A5;
         text-align: center;
+        margin-bottom: 10px;
     }
-    /* タイトル強調 */
+
+    /* --- 🍑 タイトルデザイン --- */
     .main-title {
         text-align: center;
-        font-size: 32px;
+        font-size: 36px;
         font-weight: 900;
-        color: #2E7D32;
+        background: -webkit-linear-gradient(0deg, #FF9800, #F06292);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
         margin-bottom: 5px;
-        text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 2px 2px 0 rgba(0,0,0,0.1);
+        filter: drop-shadow(2px 2px 0px rgba(0,0,0,0.1));
     }
     .sub-title {
         text-align: center;
         font-size: 16px;
         font-weight: bold;
-        color: #555;
-        margin-bottom: 20px;
+        color: #78909C;
+        margin-bottom: 25px;
+        letter-spacing: 1px;
     }
-    /* フッター */
+
+    /* --- 🦶 フッター --- */
     .footer-container {
-        margin-top: 50px;
-        padding-top: 20px;
-        border-top: 1px solid #ddd;
+        margin-top: 60px;
+        padding-top: 30px;
+        border-top: 1px solid #EEEEEE;
         text-align: center;
         font-size: 12px;
-        color: #666;
-    }
-    .footer-section {
-        margin-bottom: 15px;
+        color: #90A4AE;
     }
     .footer-label {
         font-weight: bold;
         margin-bottom: 5px;
-        color: #333;
+        color: #546E7A;
+        font-size: 13px;
     }
-    /* デコ活説明用 */
+
+    /* --- 📚 デコ活説明コーナー --- */
     .decokatsu-intro {
-        background-color: #E1F5FE;
-        padding: 15px;
-        border-radius: 10px;
+        background-color: #E3F2FD;
+        padding: 20px;
+        border-radius: 15px;
         margin-bottom: 20px;
-        border-left: 5px solid #039BE5;
+        border: 2px solid #BBDEFB;
     }
     .intro-header {
-        color: #0277BD;
+        color: #1976D2;
         font-weight: bold;
-        font-size: 18px;
-        margin-bottom: 10px;
-        border-bottom: 2px solid #0277BD;
-        padding-bottom: 5px;
+        font-size: 20px;
+        margin-bottom: 15px;
+        border-bottom: 2px dashed #90CAF9;
+        padding-bottom: 8px;
+        text-align: center;
     }
     .kids-action {
         background-color: #FFFDE7;
-        border: 2px dashed #FFD600;
+        border: 3px dashed #FDD835;
         padding: 15px;
-        border-radius: 10px;
+        border-radius: 15px;
         text-align: center;
         margin-bottom: 20px;
         font-weight: bold;
-        color: #333;
+        color: #5D4037;
         font-size: 18px;
     }
     .parent-memo {
         background-color: #fff;
-        padding: 10px;
-        border-radius: 5px;
-        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #E0E0E0;
         font-size: 14px;
-        margin-top: 10px;
+        margin-top: 15px;
+        color: #555;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     }
-    /* タブデザイン */
+
+    /* --- タブのデザイン強化 --- */
     div[data-baseweb="tab-list"] {
-        gap: 5px;
+        gap: 8px;
+        margin-bottom: 10px;
     }
     button[data-baseweb="tab"] {
-        background-color: #FFE0B2;
-        border: 1px solid #FFCC80;
-        border-radius: 5px 5px 0 0;
+        background-color: #FFF3E0;
+        border: 1px solid #FFE0B2;
+        border-radius: 20px 20px 0 0; /* 丸みをつける */
         font-weight: bold;
-        color: #E65100;
-        padding: 10px 15px;
-        font-size: 16px;
+        color: #EF6C00;
+        padding: 12px 10px;
+        font-size: 14px;
+        transition: all 0.2s;
     }
     button[data-baseweb="tab"]:hover {
-        background-color: #FFCC80;
+        background-color: #FFE0B2;
+        padding-top: 10px; /* ちょっと動く */
     }
     button[data-baseweb="tab"][aria-selected="true"] {
         background-color: #FF9800 !important;
         color: white !important;
         border: none;
+        box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -384,7 +459,6 @@ def login_screen():
     st.markdown('<div class="main-title">🍑 おかやまデコ活チャレンジ</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
 
-    # === ★ デコ活説明コーナー（親子で学ぶフロー） ===
     with st.expander("🔰 最初のミッション：おうちの人と「デコ活」を知ろう！（ここをクリック）", expanded=False):
         
         st.markdown("""
@@ -396,7 +470,7 @@ def login_screen():
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 1： 「デコ活」ってなあに？</div>
-            <p>おうちの人と一緒に、下の絵を見てみよう。</p>
+            <p style="text-align:center;">おうちの人と一緒に、下の絵を見てみよう。</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -418,7 +492,7 @@ def login_screen():
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 2： なにをすればいいの？</div>
-            <p>いろんな「デコ活」があるよ！下のタブを押して見てみてね。</p>
+            <p style="text-align:center;">いろんな「デコ活」があるよ！下のタブを押して見てみてね。</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -461,7 +535,7 @@ def login_screen():
         st.markdown("""
         <div class="decokatsu-intro">
             <div class="intro-header">STEP 3： 未来はどうなるの？</div>
-            <p>デコ活を続けると、10年後の未来はこんなに素敵になるよ！</p>
+            <p style="text-align:center;">デコ活を続けると、10年後の未来はこんなに素敵になるよ！</p>
         </div>
         """, unsafe_allow_html=True)
 
