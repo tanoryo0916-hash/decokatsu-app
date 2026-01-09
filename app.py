@@ -234,7 +234,7 @@ st.markdown("""
 
     /* --- 📌 ログイン注意事項ボックス --- */
     .login-guide {
-        background-color: #FFEBEE; /* 薄い赤/ピンク */
+        background-color: #FFEBEE;
         border: 2px solid #FFCDD2;
         border-radius: 15px;
         padding: 15px;
@@ -245,6 +245,36 @@ st.markdown("""
     .login-guide strong {
         color: #D32F2F;
         font-weight: 900;
+    }
+
+    /* --- 🎉 イベント告知ボックス（フェス誘導） --- */
+    .event-promo-box {
+        background: linear-gradient(135deg, #F8BBD0 0%, #F48FB1 100%); /* ピンク系 */
+        border: 4px solid #EC407A;
+        border-radius: 20px;
+        padding: 25px 20px;
+        text-align: center;
+        margin-top: 40px;
+        margin-bottom: 20px;
+        color: #880E4F;
+        box-shadow: 0 8px 16px rgba(233, 30, 99, 0.2);
+    }
+    .event-title {
+        font-size: 24px;
+        font-weight: 900;
+        margin-bottom: 10px;
+        color: #C2185B;
+        text-shadow: 1px 1px 0px rgba(255,255,255,0.8);
+    }
+    .event-date {
+        background-color: white;
+        color: #EC407A;
+        font-weight: bold;
+        padding: 5px 15px;
+        border-radius: 20px;
+        display: inline-block;
+        margin-bottom: 15px;
+        font-size: 18px;
     }
 
     /* --- ℹ️ ミッション説明ボックス --- */
@@ -371,7 +401,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-#  2. データ定義（岡山弁＆トリビア）
+#  2. データ定義
 # ==========================================
 
 OKAYAMA_PRAISE_LIST = [
@@ -498,6 +528,23 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
     except Exception as e:
         st.error(f"保存失敗: {e}")
         return False
+
+# ★ イベント誘導（チラシ表示）関数
+def show_event_promo():
+    st.markdown("""
+    <div class="event-promo-box">
+        <div class="event-title">🎉 おかやまデコ活フェス2026 🎉</div>
+        <div class="event-date">6月6日(土)・7日(日) 開催！</div>
+        <p><strong>このスマホを 持って<br>会場（かいじょう）へ あそびにきてね！</strong><br>
+        ためた ポイントで 「ガラポン抽選（ちゅうせん）」 ができるよ！</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    img_path = "fes_flyer.jpg"
+    if os.path.exists(img_path):
+        st.image(img_path, caption="おかやまデコ活フェス2026 チラシ", use_column_width=True)
+    else:
+        st.info("※ここに「フェスのチラシ画像」が表示されます")
 
 def show_footer():
     st.markdown("""
@@ -709,7 +756,7 @@ def login_screen():
     
     st.markdown("### 🏫 ヒーロー登録（ログイン）")
     
-    # === ★ ログイン注意事項（ブックマーク案内） ===
+    # === ★ ログイン注意事項 ===
     st.markdown("""
     <div class="login-guide">
         <strong>📌 わすれないでね！</strong><br>
@@ -717,7 +764,6 @@ def login_screen():
         ② この ページを <strong>「ブックマーク（お気に入り）」</strong> して、また すぐ これるように してね！
     </div>
     """, unsafe_allow_html=True)
-    # ============================================
 
     with st.form("login_form"):
         st.markdown("**小学校の名前**")
@@ -758,6 +804,8 @@ def login_screen():
                 }
                 st.rerun()
     
+    # ★ フェス誘導（ログイン画面下）
+    show_event_promo()
     show_footer()
 
 def main_screen():
@@ -987,7 +1035,9 @@ def main_screen():
     if st.button("ログアウト", key="logout"):
         st.session_state.user_info = None
         st.rerun()
-        
+    
+    # ★ フェス誘導（メイン画面下）
+    show_event_promo()
     show_footer()
 
 if __name__ == "__main__":
