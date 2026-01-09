@@ -3,6 +3,7 @@ import datetime
 import gspread
 from google.oauth2.service_account import Credentials
 import time
+import os # 画像ファイル確認用
 
 # --- 真っ白画面回避のための安全策 ---
 try:
@@ -162,6 +163,11 @@ st.markdown("""
         margin-bottom: 20px;
         border-left: 5px solid #039BE5;
     }
+    .deco-keyword {
+        font-weight: bold;
+        color: #0277BD;
+        font-size: 18px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -186,7 +192,7 @@ def get_connection():
         st.error("システムエラー: 設定(Secrets)を確認してください")
         return None
 
-# ★ 全体集計（参加者数・ヒーロー数・CO2）
+# ★ 全体集計
 @st.cache_data(ttl=60)
 def fetch_global_stats():
     client = get_connection()
@@ -301,30 +307,62 @@ def login_screen():
     st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
 
     # === ★ デコ活説明コーナー（おうちの人向け） ===
-    with st.expander("ℹ️ おうちの方へ：「デコ活」ってなに？（クリックで読む）", expanded=True):
+    with st.expander("ℹ️ 保護者の方へ：「デコ活」をお子様に伝えるために", expanded=True):
         st.markdown("""
         <div class="decokatsu-intro">
-            <h4>👩‍🏫 お子様と一緒に読んでみてください</h4>
-            <p><strong>「デコ活」</strong>とは、環境省が推進する<strong>「脱炭素（Decarbonization）」</strong>と<strong>「エコな活動」</strong>を組み合わせた新しい言葉です。<br>
-            難しく聞こえますが、要するに<strong>「地球が暑くなりすぎないように、CO2（二酸化炭素）を減らす快適な暮らし」</strong>のことです。</p>
+            <h4>🌿 「デコ活」ってなあに？</h4>
+            <p>環境省が推進する「脱炭素（<strong>Deco</strong>arbonization）」と「エコな活動（<strong>Katsu</strong>）」を合わせた新しい言葉です。<br>
+            二酸化炭素（CO2）を減らしながら、快適で豊かな生活を送ることを目指しています。</p>
         </div>
         """, unsafe_allow_html=True)
+
+        # 1枚目の画像（デコ活ロゴと意味）
+        img1 = "decokatsu_panel_ver03_page-0001.jpg"
+        if os.path.exists(img1):
+            st.image(img1, caption="出典：環境省「デコ活」資料より", use_column_width=True)
+        else:
+            st.info("※ここに「デコ活とは（蝶のロゴ）」の解説画像が入ります")
+
+        st.markdown("""
+        #### 🦋 バタフライエフェクト
+        デコ活のロゴは「蝶」をモチーフにしています。
+        **「一人ひとりの小さな行動（羽ばたき）が、やがて地球を変える大きなうねりになる」** という願いが込められています。
+        お子様には**「君の小さな『スイッチOFF』が、地球を救う風になるんだよ！」**と伝えてあげてください。
+        """)
         
-        # --- ここに環境省の資料画像などを入れる ---
-        # ※実際の画像URLがあれば差し替えてください。現在はプレースホルダーです。
-        col_img1, col_img2 = st.columns(2)
-        with col_img1:
-             st.image("https://ondankataisaku.env.go.jp/decokatsu/assets/images/common/logo-decokatsu.png", caption="デコ活ロゴ（出典：環境省）")
-        with col_img2:
-             st.markdown("""
-             **🌟 具体的なアクション事例**
-             * **クールビズ・ウォームビズ**： 服装で温度調節！
-             * **食品ロス削減**： 食べ残しをゼロに！
-             * **スマートムーブ**： 徒歩や自転車で移動！
-             * **省エネ家電**： LEDやエコ家電を使おう！
-             """)
+        st.markdown("---")
+
+        st.markdown("#### 🏃‍♂️ 具体的なアクション事例")
+        st.markdown("デコ活には「デ・コ・カ・ツ」の4つのアクションがあります。")
         
-        st.info("このアプリでは、小学生でも取り組みやすい5つの「デコ活アクション」を実践し、家族みんなで習慣化することを目指しています。")
+        # 2枚目の画像（アクション事例）
+        img2 = "decokatsu_panel_ver03_page-0002.jpg"
+        if os.path.exists(img2):
+            st.image(img2, caption="出典：環境省「デコ活」資料より", use_column_width=True)
+        else:
+             st.info("※ここに「デコ活アクション事例」の解説画像が入ります")
+
+        col_a, col_b = st.columns(2)
+        with col_a:
+            st.markdown("""
+            * **<span class="deco-keyword">デ</span>：電気も省エネ**
+                * 使わない電気を消す
+                * 省エネ家電を選ぶ
+            * **<span class="deco-keyword">コ</span>：こだわる楽しさ**
+                * 長く使えるものを選ぶ
+                * エコグッズを使う
+            """, unsafe_allow_html=True)
+        with col_b:
+            st.markdown("""
+            * **<span class="deco-keyword">カ</span>：感謝の心**
+                * 食べ残しをしない（食品ロスゼロ）
+                * 物を大切にする
+            * **<span class="deco-keyword">ツ</span>：つながる**
+                * 家族でエコについて話す
+                * 地域で取り組む
+            """, unsafe_allow_html=True)
+        
+        st.success("このアプリでは、これらのアクションの中から小学生が実践しやすい5つをピックアップしています。ぜひご家庭で一緒に取り組んでみてください。")
     # ==============================================
 
     if HAS_PANDAS:
