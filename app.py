@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定（おしゃれ＆軽量化） ---
+# --- CSS設定（おしゃれ＆軽量化＆ヒーロー豪華版） ---
 st.markdown("""
 <style>
     /* 全体のフォント設定 */
@@ -33,7 +33,7 @@ st.markdown("""
         color: #333;
     }
 
-    /* --- 🍑 ボタンのデザイン（グラデーション＆浮き上がり） --- */
+    /* --- 🍑 ボタンのデザイン --- */
     .stButton>button {
         width: 100%;
         height: 70px;
@@ -85,7 +85,7 @@ st.markdown("""
         color: #555;
     }
 
-    /* --- 🏆 ヒーローカード（認定証） --- */
+    /* --- 🏆 ユーザー用 認定証カード --- */
     .hero-card {
         background: linear-gradient(135deg, #FFD54F, #FFECB3);
         border: 4px solid #FFA000;
@@ -126,33 +126,90 @@ st.markdown("""
         padding-bottom: 5px;
     }
 
-    /* --- 📊 グローバル集計ボード --- */
-    .global-stats {
-        background: linear-gradient(145deg, #263238, #37474F);
-        color: white;
+    /* --- 👑 ログイン画面：認定ヒーロー数（豪華版） --- */
+    @keyframes shine {
+        0% { background-position: -100px; }
+        40%, 100% { background-position: 300px; }
+    }
+    .special-hero-stats {
+        background: linear-gradient(135deg, #FFC107 0%, #FFECB3 50%, #FF8F00 100%);
+        border: 4px solid #FFFFFF;
+        border-radius: 20px;
         padding: 20px;
+        text-align: center;
+        margin-bottom: 15px;
+        box-shadow: 0 10px 25px rgba(255, 143, 0, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+    /* 光るエフェクト */
+    .special-hero-stats::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,0) 100%);
+        background-repeat: no-repeat;
+        background-size: 50px 100%;
+        transform: skewX(-20deg);
+        animation: shine 4s infinite linear;
+    }
+    .special-hero-label {
+        font-size: 16px;
+        font-weight: bold;
+        color: #5D4037;
+        letter-spacing: 1px;
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 5px;
+    }
+    .special-hero-num {
+        font-size: 60px;
+        font-weight: 900;
+        color: #BF360C;
+        text-shadow: 3px 3px 0px #FFFFFF, 5px 5px 10px rgba(0,0,0,0.2);
+        margin: 0;
+        line-height: 1;
+        font-family: 'Arial', sans-serif;
+    }
+    .special-hero-unit {
+        font-size: 20px;
+        color: #5D4037;
+        margin-left: 5px;
+        text-shadow: none;
+    }
+
+    /* --- 📊 ログイン画面：サブ統計（参加者・CO2） --- */
+    .sub-stats-container {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+    .sub-stat-box {
+        flex: 1;
+        background: linear-gradient(145deg, #37474F, #263238);
+        color: white;
+        padding: 15px;
         border-radius: 15px;
         text-align: center;
-        margin-bottom: 25px;
-        box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        border: 1px solid #546E7A;
     }
-    .stat-box {
-        flex: 1;
-        padding: 0 5px;
-    }
-    .stat-num {
-        color: #FFD700;
-        font-size: 32px;
-        font-weight: 900;
-        margin: 0;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-    }
-    .stat-label {
-        font-size: 13px;
-        margin: 0;
-        opacity: 0.9;
+    .sub-stat-label {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-bottom: 5px;
         font-weight: bold;
-        color: #CFD8DC;
+        color: #B0BEC5;
+    }
+    .sub-stat-num {
+        font-size: 22px;
+        font-weight: bold;
+        color: #81D4FA; /* 水色系でクールに */
     }
 
     /* --- ℹ️ ミッション説明ボックス --- */
@@ -185,7 +242,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* --- 🍑 タイトルデザイン（メイン画面用） --- */
+    /* --- 🍑 タイトルデザイン（メイン画面） --- */
     .main-title {
         text-align: center;
         font-size: 32px;
@@ -440,7 +497,6 @@ if 'user_info' not in st.session_state:
 
 def login_screen():
     # --- おしゃれなカスタムヘッダー ---
-    # 背景画像は、岡山の風景や自然をイメージしたフリー素材のURLを使用（デモ用）
     header_bg_url = "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
 
     st.markdown(f"""
@@ -486,7 +542,7 @@ def login_screen():
     </div>
     """, unsafe_allow_html=True)
 
-    # === ★ デコ活説明コーナー ===
+    # === ★ デコ活説明コーナー（親子で学ぶフロー） ===
     with st.expander("🔰 最初のミッション：おうちの人と「デコ活」を知ろう！（ここをクリック）", expanded=False):
         
         st.markdown("""
@@ -583,37 +639,29 @@ def login_screen():
 
     if HAS_PANDAS:
         g_co2, g_heroes, g_participants = fetch_global_stats()
+        
+        # --- 認定ヒーロー数（豪華版） ---
         st.markdown(f"""
-        <div class="global-stats">
-            <p>みんなで地球を救おう！現在の達成状況</p>
-            <div style="display:flex; justify-content:space-between; margin-top:10px;">
-                <div class="stat-box">
-                    <p class="stat-label">現在の参加者</p>
-                    <p class="stat-num">{g_participants:,}<span style="font-size:12px;">人</span></p>
-                </div>
-                <div class="stat-box" style="border-left:1px solid #555; border-right:1px solid #555;">
-                    <p class="stat-label">認定ヒーロー</p>
-                    <p class="stat-num">{g_heroes:,}<span style="font-size:12px;">人</span></p>
-                </div>
-                <div class="stat-box">
-                    <p class="stat-label">CO2削減量</p>
-                    <p class="stat-num">{g_co2:,}<span style="font-size:12px;">g</span></p>
-                </div>
+        <div class="special-hero-stats">
+            <div class="special-hero-label">👑 現在の 認定エコヒーロー</div>
+            <p class="special-hero-num">{g_heroes:,}<span class="special-hero-unit">人</span></p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # --- サブ統計（参加者・CO2） ---
+        st.markdown(f"""
+        <div class="sub-stats-container">
+            <div class="sub-stat-box">
+                <div class="sub-stat-label">現在の参加者</div>
+                <div class="sub-stat-num">{g_participants:,}<span style="font-size:12px;">人</span></div>
+            </div>
+            <div class="sub-stat-box">
+                <div class="sub-stat-label">CO2削減量</div>
+                <div class="sub-stat-num">{g_co2:,}<span style="font-size:12px;">g</span></div>
             </div>
         </div>
         """, unsafe_allow_html=True)
     
-    st.markdown("""
-    <div class="mission-box">
-        <div class="mission-header">🌏 緊急ミッション！地球を救うヒーロー求む！</div>
-        <p style="font-weight:bold;">君の「スイッチOFF」が、地球を守るパワーになる！</p>
-        <p style="font-size:15px;">いま、地球は「CO2」というガスのせいで、どんどん暑くなっているんだ（地球温暖化）。<br>
-        でも大丈夫！君が電気をこまめに消したり、ごはんを残さず食べるだけで、地球を冷やすことができるよ。</p>
-        <p style="font-weight:bold; color:#E65100;">👉 目標は「10,000人のエコヒーロー」を集めること！<br>
-        さあ、君もチームに参加して、未来の地球を守ろう！</p>
-    </div>
-    """, unsafe_allow_html=True)
-
     st.markdown("### 🏫 ヒーロー登録（ログイン）")
     st.info("学校名と、自分の「年・組・番号」を入れてスタート！")
 
