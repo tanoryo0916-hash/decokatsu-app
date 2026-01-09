@@ -154,6 +154,14 @@ st.markdown("""
         margin-bottom: 5px;
         color: #333;
     }
+    /* デコ活説明用 */
+    .decokatsu-intro {
+        background-color: #E1F5FE;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        border-left: 5px solid #039BE5;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -292,6 +300,33 @@ def login_screen():
     st.markdown('<div class="main-title">🍑 おかやまデコ活チャレンジ</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
 
+    # === ★ デコ活説明コーナー（おうちの人向け） ===
+    with st.expander("ℹ️ おうちの方へ：「デコ活」ってなに？（クリックで読む）", expanded=True):
+        st.markdown("""
+        <div class="decokatsu-intro">
+            <h4>👩‍🏫 お子様と一緒に読んでみてください</h4>
+            <p><strong>「デコ活」</strong>とは、環境省が推進する<strong>「脱炭素（Decarbonization）」</strong>と<strong>「エコな活動」</strong>を組み合わせた新しい言葉です。<br>
+            難しく聞こえますが、要するに<strong>「地球が暑くなりすぎないように、CO2（二酸化炭素）を減らす快適な暮らし」</strong>のことです。</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # --- ここに環境省の資料画像などを入れる ---
+        # ※実際の画像URLがあれば差し替えてください。現在はプレースホルダーです。
+        col_img1, col_img2 = st.columns(2)
+        with col_img1:
+             st.image("https://ondankataisaku.env.go.jp/decokatsu/assets/images/common/logo-decokatsu.png", caption="デコ活ロゴ（出典：環境省）")
+        with col_img2:
+             st.markdown("""
+             **🌟 具体的なアクション事例**
+             * **クールビズ・ウォームビズ**： 服装で温度調節！
+             * **食品ロス削減**： 食べ残しをゼロに！
+             * **スマートムーブ**： 徒歩や自転車で移動！
+             * **省エネ家電**： LEDやエコ家電を使おう！
+             """)
+        
+        st.info("このアプリでは、小学生でも取り組みやすい5つの「デコ活アクション」を実践し、家族みんなで習慣化することを目指しています。")
+    # ==============================================
+
     if HAS_PANDAS:
         g_co2, g_heroes, g_participants = fetch_global_stats()
         st.markdown(f"""
@@ -367,7 +402,6 @@ def login_screen():
                 }
                 st.rerun()
     
-    # ログイン画面フッター
     show_footer()
 
 def main_screen():
@@ -586,7 +620,6 @@ def main_screen():
         st.session_state.user_info = None
         st.rerun()
         
-    # メイン画面フッター
     show_footer()
 
 if __name__ == "__main__":
