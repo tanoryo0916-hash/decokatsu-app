@@ -142,7 +142,6 @@ st.markdown("""
         position: relative;
         overflow: hidden;
     }
-    /* 光るエフェクト */
     .special-hero-stats::after {
         content: "";
         position: absolute;
@@ -183,11 +182,11 @@ st.markdown("""
         text-shadow: none;
     }
 
-    /* --- 📊 ログイン画面：サブ統計（参加者・CO2） --- */
+    /* --- 📊 ログイン画面：サブ統計 --- */
     .sub-stats-container {
         display: flex;
         gap: 15px;
-        margin-bottom: 25px;
+        margin-bottom: 15px;
     }
     .sub-stat-box {
         flex: 1;
@@ -209,7 +208,28 @@ st.markdown("""
     .sub-stat-num {
         font-size: 22px;
         font-weight: bold;
-        color: #81D4FA; /* 水色系でクールに */
+        color: #81D4FA;
+    }
+
+    /* --- ⚽ サッカーボール換算 --- */
+    .soccer-visual {
+        background-color: #E8F5E9; /* 芝生っぽい薄緑 */
+        border: 2px dashed #66BB6A;
+        border-radius: 15px;
+        padding: 15px;
+        text-align: center;
+        margin-bottom: 30px;
+        color: #2E7D32;
+    }
+    .soccer-text {
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .soccer-count {
+        font-size: 24px;
+        font-weight: 900;
+        color: #1B5E20;
     }
 
     /* --- ℹ️ ミッション説明ボックス --- */
@@ -242,7 +262,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* --- 🍑 タイトルデザイン（メイン画面） --- */
+    /* --- 🍑 タイトルデザイン --- */
     .main-title {
         text-align: center;
         font-size: 32px;
@@ -659,6 +679,16 @@ def login_screen():
                 <div class="sub-stat-label">CO2削減量</div>
                 <div class="sub-stat-num">{g_co2:,}<span style="font-size:12px;">g</span></div>
             </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # --- ⚽ サッカーボール換算 ---
+        soccer_balls = int(g_co2 / 10)  # 10g = 1球（約）
+        st.markdown(f"""
+        <div class="soccer-visual">
+            <div class="soccer-text">もし、みんなが減らしたCO2が<br>⚽サッカーボール⚽ だったら…？</div>
+            <div class="soccer-count">{soccer_balls:,} <span style="font-size:16px;">個分！</span></div>
+            <div style="font-size:10px; opacity:0.8;">※CO2 1kg(1000g)の体積 ≒ サッカーボール約100個分として計算</div>
         </div>
         """, unsafe_allow_html=True)
     
