@@ -27,7 +27,6 @@ st.markdown("""
     html, body, [class*="css"] {
         font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
     }
-    /* 送信ボタンを目立たせる */
     .stButton>button {
         width: 100%;
         height: 70px;
@@ -48,7 +47,6 @@ st.markdown("""
         padding-top: 35px;
         color: #333;
     }
-    /* スペシャルミッション用 */
     .special-mission {
         background-color: #e0f7fa;
         padding: 20px;
@@ -109,7 +107,7 @@ def fetch_user_data(school_full_name, grade, u_class, number):
                 if row.get('ニックネーム'):
                     nickname = row.get('ニックネーム')
                 
-                # 履歴データを上書き更新（修正対応のため、同じ日付なら新しいデータが優先されるようにする）
+                # 履歴データを上書き更新
                 r_date = row.get('対象日付')
                 r_actions = row.get('実施項目')
                 if r_date:
@@ -178,7 +176,6 @@ def login_screen():
             with st.spinner("データを読み込んでいます..."):
                 full_school_name = f"{school_core}小学校"
                 
-                # history_dict を取得
                 user_id, saved_name, total, history_dict = fetch_user_data(full_school_name, grade, u_class, number)
                 final_name = saved_name if saved_name else nickname_input
                 
@@ -205,19 +202,17 @@ def main_screen():
     st.markdown("---")
 
     # ==========================================
-    #  📊 チャレンジ入力表 (直接操作版)
+    #  📊 チャレンジ入力表
     # ==========================================
     st.markdown("### 📝 チャレンジ・チェック表")
-    st.info("やったことにチェックを入れて、「保存する」ボタンを押してね！後から修正もできるよ。")
+    st.info("やったことにチェックを入れて、「保存する」ボタンを押してね！")
     
     if not HAS_PANDAS:
         st.warning("⚠️ 設定(requirements.txt)に 'pandas' を追加してください。")
     else:
-        # 表の設定
         target_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
         categories = ["電気", "食事", "水", "分別", "マイデコ"]
         
-        # 表示用のラベルと、保存用のキーワードの対応
         cat_map = {
             "① 💡 電気を消した": "電気",
             "② 🍚 残さず食べた": "食事",
@@ -227,24 +222,19 @@ def main_screen():
         }
         point_map = {"電気": 50, "食事": 100, "水": 30, "分別": 80, "マイデコ": 50}
         
-        # データを整形 (行:アクション、列:日付)
-        # 初期値は False (チェックなし)
+        # データの準備
         df_data = {date: [False]*len(categories) for date in target_dates}
-        
-        # 履歴データ(history_dict)があれば反映
         history = user.get('history_dict', {})
+        
         for date_col in target_dates:
             if date_col in history:
-                done_actions = history[date_col] # ["電気", "食事"] など
+                done_actions = history[date_col]
                 for i, cat in enumerate(categories):
-                    # cat_mapの値と比較
                     if cat_map.get(list(cat_map.keys())[i]) in done_actions:
                          df_data[date_col][i] = True
 
-        # DataFrame作成
         df = pd.DataFrame(df_data, index=cat_map.keys())
 
-        # ★ ここがポイント：編集可能なデータフレームを表示 ★
         edited_df = st.data_editor(
             df,
             column_config={
@@ -253,67 +243,58 @@ def main_screen():
                 "6/3 (水)": st.column_config.CheckboxColumn("6/3 (水)", default=False),
                 "6/4 (木)": st.column_config.CheckboxColumn("6/4 (木)", default=False),
             },
-            disabled=[], # 全セル編集可能
+            disabled=[], 
             hide_index=False,
             use_container_width=True
         )
 
-        # 保存ボタン
+        # === 修正箇所：保存時の処理 ===
         if st.button("✅ チェックした内容を保存する", type="primary"):
             with st.spinner("記録しています..."):
                 save_count = 0
                 total_new_points_session = 0
                 
-                # 編集されたDataFrameを走査して保存
-                # 日付ごとにループ
+                # ★修正ポイント: API再取得をせず、手元のデータを更新するための変数を用意
+                # （APIの反映遅延対策）
+                current_history = history.copy()
+
                 for date_col in target_dates:
-                    # その日の現在のチェック状況を取得
-                    current_checks = edited_df[date_col] # Series (True/False)
+                    current_checks = edited_df[date_col]
                     
-                    # 実施項目リストを作成
                     actions_to_save = []
                     day_points = 0
                     
                     for idx, is_checked in current_checks.items():
                         if is_checked:
-                            # インデックス名から短いキーワード(電気etc)に変換
                             short_name = cat_map[idx]
                             actions_to_save.append(short_name)
                             day_points += point_map[short_name]
                     
-                    # 変更があるか確認（サーバー負荷軽減のため）
-                    # 以前のデータと比較
-                    prev_actions = history.get(date_col, [])
-                    # 集合(set)にして比較すると順序関係なく一致確認できる
+                    prev_actions = current_history.get(date_col, [])
+                    
                     if set(actions_to_save) != set(prev_actions):
-                        # 変更があるので保存（新しい行を追加＝上書き扱い）
-                        # CO2削減量は「その日の合計」ではなく「差分」で足すべきだが、
-                        # 簡易的に「その日の合計」をログに残し、表示側で最新行を採用するロジックにしているため
-                        # ここでは「その日の合計ポイント」を保存する。
-                        # ※ただし、合計CO2の計算は複雑になるため、今回は「ポイント加算」は表示上行わず
-                        # ログとして残すことに注力する（または差分計算する）
-                        
-                        # シンプル化: 今回の保存で得られるポイント - 前回までのポイント = 加算すべき差分
                         prev_points = sum([point_map[a] for a in prev_actions if a in point_map])
                         diff_points = day_points - prev_points
                         
+                        # スプレッドシートへ保存
                         save_daily_challenge(
                             user['id'], user['name'], date_col, actions_to_save, diff_points, "一括更新"
                         )
                         total_new_points_session += diff_points
                         save_count += 1
+                        
+                        # ★手元のデータも更新して最新状態にする
+                        current_history[date_col] = actions_to_save
                 
                 if save_count > 0:
-                    # データを再取得して画面更新
-                    full_school_name = user['school']
-                    _, _, new_total, new_history_dict = fetch_user_data(full_school_name, "", "", "")
-                    
-                    st.session_state.user_info['total_co2'] = new_total
-                    st.session_state.user_info['history_dict'] = new_history_dict
+                    # ★修正ポイント: APIから再取得(fetch_user_data)せずに、
+                    # 手元で更新したデータをセッションに反映する（即時反映）
+                    st.session_state.user_info['history_dict'] = current_history
+                    st.session_state.user_info['total_co2'] += total_new_points_session
                     
                     st.balloons()
                     st.success(f"保存しました！ ポイント変動: {total_new_points_session}g")
-                    time.sleep(2)
+                    time.sleep(1)
                     st.rerun()
                 else:
                     st.info("変更はありませんでした。")
@@ -321,7 +302,7 @@ def main_screen():
     st.markdown("---")
     
     # ==========================================
-    #  6/5 スペシャルミッション（アンケート）
+    #  6/5 スペシャルミッション
     # ==========================================
     with st.expander("🌿 6/5 環境の日 スペシャルミッション（アンケート）", expanded=True):
         st.write("6/5(金)になったら、ここに入力してね！")
