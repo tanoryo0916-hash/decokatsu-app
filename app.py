@@ -16,7 +16,7 @@ except ImportError:
 # ==========================================
 st.set_page_config(
     page_title="おかやまデコ活チャレンジ",
-    page_icon="🌏",
+    page_icon="🍑",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
@@ -96,12 +96,63 @@ st.markdown("""
         margin: 0;
         opacity: 0.8;
     }
+    /* ログイン画面のミッション説明ボックス */
+    .mission-box {
+        background-color: #FFF3E0;
+        border: 2px solid #FFB74D;
+        border-radius: 15px;
+        padding: 20px;
+        margin-bottom: 20px;
+        color: #333;
+    }
+    .mission-header {
+        font-size: 20px;
+        font-weight: bold;
+        color: #E65100;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
     .metric-container {
         padding: 10px;
         background-color: #f8f9fa;
         border-radius: 10px;
         border: 1px solid #ddd;
         text-align: center;
+    }
+    /* タイトル強調 */
+    .main-title {
+        text-align: center;
+        font-size: 32px;
+        font-weight: 900;
+        color: #2E7D32;
+        margin-bottom: 5px;
+        text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 2px 2px 0 rgba(0,0,0,0.1);
+    }
+    .sub-title {
+        text-align: center;
+        font-size: 16px;
+        font-weight: bold;
+        color: #555;
+        margin-bottom: 20px;
+    }
+    /* フッター */
+    .footer-container {
+        margin-top: 50px;
+        padding-top: 20px;
+        border-top: 1px solid #ddd;
+        text-align: center;
+        font-size: 12px;
+        color: #666;
+    }
+    .footer-section {
+        margin-bottom: 15px;
+    }
+    .footer-label {
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #333;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -203,6 +254,28 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         st.error(f"保存失敗: {e}")
         return False
 
+# ★ フッター表示関数
+def show_footer():
+    st.markdown("""
+    <div class="footer-container">
+        <div class="footer-section">
+            <div class="footer-label">主催</div>
+            <div>日本青年会議所 中国地区 岡山ブロック協議会<br>環境未来デザイン委員会</div>
+        </div>
+        <div class="footer-section">
+            <div class="footer-label">後援</div>
+            <div>（ここに後援団体名が入ります）</div>
+        </div>
+        <div class="footer-section">
+            <div class="footer-label">協賛</div>
+            <div>（ここに協賛企業名が入ります）</div>
+        </div>
+        <div style="margin-top:20px; font-size:10px;">
+            © 2026 Okayama Decokatsu Challenge
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 # ==========================================
 #  3. セッション管理
 # ==========================================
@@ -214,9 +287,13 @@ if 'user_info' not in st.session_state:
 # ==========================================
 
 def login_screen():
+    st.image("https://placehold.jp/3d4070/ffffff/800x200.png?text=Okayama%20Decokatsu%20Challenge", use_column_width=True)
+    
+    st.markdown('<div class="main-title">🍑 おかやまデコ活チャレンジ</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
+
     if HAS_PANDAS:
         g_co2, g_heroes, g_participants = fetch_global_stats()
-        
         st.markdown(f"""
         <div class="global-stats">
             <p>みんなで地球を救おう！現在の達成状況</p>
@@ -237,9 +314,19 @@ def login_screen():
         </div>
         """, unsafe_allow_html=True)
     
-    st.image("https://placehold.jp/3d4070/ffffff/800x200.png?text=DecoKatsu%20Login", use_column_width=True)
-    st.markdown("### 🏫 チャレンジシートをはじめよう！")
-    st.info("学校名と、自分の「年・組・番号」を入れてね。")
+    st.markdown("""
+    <div class="mission-box">
+        <div class="mission-header">🌏 緊急ミッション！地球を救うヒーロー求む！</div>
+        <p style="font-weight:bold;">君の「スイッチOFF」が、地球を守るパワーになる！</p>
+        <p style="font-size:15px;">いま、地球は「CO2」というガスのせいで、どんどん暑くなっているんだ（地球温暖化）。<br>
+        でも大丈夫！君が電気をこまめに消したり、ごはんを残さず食べるだけで、地球を冷やすことができるよ。</p>
+        <p style="font-weight:bold; color:#E65100;">👉 目標は「10,000人のエコヒーロー」を集めること！<br>
+        さあ、君もチームに参加して、未来の地球を守ろう！</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### 🏫 ヒーロー登録（ログイン）")
+    st.info("学校名と、自分の「年・組・番号」を入れてスタート！")
 
     with st.form("login_form"):
         st.markdown("**小学校の名前**")
@@ -258,7 +345,7 @@ def login_screen():
             
         nickname_input = st.text_input("ニックネーム（ひらがな）", placeholder="例：でこかつたろう")
 
-        submit = st.form_submit_button("スタート！", type="primary")
+        submit = st.form_submit_button("ミッションスタート！", type="primary")
 
         if submit:
             if not school_core or not nickname_input or not u_class:
@@ -279,20 +366,22 @@ def login_screen():
                     'history_dict': history_dict
                 }
                 st.rerun()
+    
+    # ログイン画面フッター
+    show_footer()
 
 def main_screen():
     user = st.session_state.user_info
     
-    # --- エコヒーロー判定 ---
     is_eco_hero = False
     for actions in user['history_dict'].values():
         if "環境の日アンケート" in actions:
             is_eco_hero = True
             break
     
+    st.markdown("### 🍑 おかやまデコ活チャレンジ")
     st.markdown(f"**👋 こんにちは、{user['name']} さん！**")
     
-    # --- 🏆 エコヒーロー認定証 ---
     if is_eco_hero:
         st.markdown(f"""
         <div class="hero-card">
@@ -305,7 +394,6 @@ def main_screen():
         """, unsafe_allow_html=True)
         st.balloons()
 
-    # --- メーター表示 ---
     GOAL = 500
     MAX_POSSIBLE = 1340
     current = user['total_co2']
@@ -333,9 +421,6 @@ def main_screen():
     
     st.markdown("---")
 
-    # ==========================================
-    #  📊 チャレンジ入力表
-    # ==========================================
     st.markdown("### 📝 チャレンジ・チェック表")
     st.info("やったことにチェックを入れて、「保存する」ボタンを押してね！")
     
@@ -344,7 +429,6 @@ def main_screen():
     else:
         target_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
         
-        # --- アクション定義 ---
         action_master = {
             "電気": {
                 "label": "① 💡 だれもいない部屋の電気を消した！",
@@ -460,7 +544,6 @@ def main_screen():
             
             with st.form("special_mission_form"):
                 st.markdown("### 📝 アンケート")
-                # === 修正箇所：Q2のラベルから（必須）を削除 ===
                 q1 = st.radio("Q1. 5日間のチャレンジ、どれくらいできましたか？", ["5：パーフェクト達成！", "4：よくできた！", "3：ふつう", "2：もう少し！", "1：チャレンジはした"])
                 q2 = st.radio("Q2. デコ活をやってみて、これからも続けたいですか？", ["5：絶対つづける！", "4：つづけたい", "3：気がむいたらやる", "2：むずかしいかも", "1：もうやらない"])
                 q3 = st.radio("Q3. おうちの人と「環境」や「エコ」について話しましたか？", ["5：家族みんなでやった！", "4：たくさん話した", "3：少し話した", "2：あまり話していない", "1：全然話していない"])
@@ -502,6 +585,9 @@ def main_screen():
     if st.button("ログアウト", key="logout"):
         st.session_state.user_info = None
         st.rerun()
+        
+    # メイン画面フッター
+    show_footer()
 
 if __name__ == "__main__":
     if st.session_state.user_info is None:
