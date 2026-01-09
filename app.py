@@ -277,17 +277,6 @@ st.markdown("""
         font-size: 18px;
     }
 
-    /* --- 🔒 ロックメッセージ --- */
-    .locked-message {
-        background-color: #ECEFF1;
-        border: 2px dashed #90A4AE;
-        border-radius: 10px;
-        padding: 20px;
-        text-align: center;
-        color: #546E7A;
-        font-weight: bold;
-    }
-
     /* --- ℹ️ ミッション説明ボックス --- */
     .mission-box {
         background-color: #FFF8E1;
@@ -540,13 +529,13 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         st.error(f"保存失敗: {e}")
         return False
 
-# ★ イベント誘導（チラシ表示）関数
+# ★ イベント誘導（チラシ表示）関数（修正済み：スマホ文言削除）
 def show_event_promo():
     st.markdown("""
     <div class="event-promo-box">
         <div class="event-title">🎉 おかやまデコ活フェス2026 🎉</div>
         <div class="event-date">6月6日(土)・7日(日) 開催！イオンモールにて</div>
-        <p><strong>特別（とくべつ）ミッションを クリアしたら、<br>このスマホを 持って会場（かいじょう）へ きてね！</strong></p>
+        <p><strong>特別（とくべつ）ミッションを クリアしたら、<br>会場（かいじょう）へ あそびにきてね！</strong></p>
         <p style="font-size:14px; background-color:white; padding:10px; border-radius:10px; display:inline-block;">
         受付（うけつけ）で<strong>「学校名」と「名前」</strong>を言うだけで<br>ガラポン抽選（ちゅうせん）に参加できるよ！
         </p>
@@ -996,57 +985,44 @@ def main_screen():
     st.markdown("---")
     
     # ==========================================
-    #  🌿 6/5 スペシャルミッション（ロック機能付き）
+    #  🌿 6/5 スペシャルミッション（常時表示・初期クローズ）
     # ==========================================
-    
-    # ★ロック解除日を設定（テスト時はここを変える）
-    MISSION_OPEN_DATE = datetime.date(2026, 6, 5)
-    today = datetime.date.today()
     
     if is_eco_hero:
         with st.expander("🌿 6/5 環境の日 スペシャルミッション（完了！）", expanded=False):
             st.success("✨ 特別ミッションクリア済み！認定証が発行されています。")
     else:
-        # 日付チェック
-        if today < MISSION_OPEN_DATE:
-            with st.expander("🌿 6/5 環境の日 スペシャルミッション（まだあかないよ）", expanded=False):
-                st.markdown("""
-                <div class="locked-message">
-                    🔒 このミッションは 6月5日（金）になると 開くよ！<br>
-                    楽しみに 待っててね！
-                </div>
-                """, unsafe_allow_html=True)
-        else:
-            with st.expander("🌿 6/5 環境の日 スペシャルミッション（アンケート）", expanded=True):
-                st.write("6/5(金)になりました！ ここに入力してね！")
+        # 常時表示（ただし初期状態は閉じておく）
+        with st.expander("🌿 6/5 環境の日 スペシャルミッション（アンケート）", expanded=False):
+            st.markdown("※ 6/5(金)になったら、ここに入力してね！（それまでは楽しみに待っててね）")
+            
+            with st.form("special_mission_form"):
+                st.markdown("### 📝 アンケート")
+                q1 = st.radio("Q1. 5日間のチャレンジ、どれくらいできましたか？", ["5：パーフェクト達成！", "4：よくできた！", "3：ふつう", "2：もう少し！", "1：チャレンジはした"])
+                q2 = st.radio("Q2. デコ活をやってみて、これからも続けたいですか？", ["5：絶対つづける！", "4：つづけたい", "3：気がむいたらやる", "2：むずかしいかも", "1：もうやらない"])
+                q3 = st.radio("Q3. おうちの人と「環境」や「エコ」について話しましたか？", ["5：家族みんなでやった！", "4：たくさん話した", "3：少し話した", "2：あまり話していない", "1：全然話していない"])
+                st.markdown("---")
+                feedback = st.text_area("感想や、これからがんばりたいこと", height=100)
                 
-                with st.form("special_mission_form"):
-                    st.markdown("### 📝 アンケート")
-                    q1 = st.radio("Q1. 5日間のチャレンジ、どれくらいできましたか？", ["5：パーフェクト達成！", "4：よくできた！", "3：ふつう", "2：もう少し！", "1：チャレンジはした"])
-                    q2 = st.radio("Q2. デコ活をやってみて、これからも続けたいですか？", ["5：絶対つづける！", "4：つづけたい", "3：気がむいたらやる", "2：むずかしいかも", "1：もうやらない"])
-                    q3 = st.radio("Q3. おうちの人と「環境」や「エコ」について話しましたか？", ["5：家族みんなでやった！", "4：たくさん話した", "3：少し話した", "2：あまり話していない", "1：全然話していない"])
-                    st.markdown("---")
-                    feedback = st.text_area("感想や、これからがんばりたいこと", height=100)
-                    
-                    submit_special = st.form_submit_button("💌 アンケートを送って エコヒーロー認定！")
-                    
-                    if submit_special:
-                        with st.spinner("送信中..."):
-                            special_points = 100
-                            actions = ["環境の日アンケート"]
+                submit_special = st.form_submit_button("💌 アンケートを送って エコヒーロー認定！")
+                
+                if submit_special:
+                    with st.spinner("送信中..."):
+                        special_points = 100
+                        actions = ["環境の日アンケート"]
+                        
+                        if save_daily_challenge(
+                            user['id'], user['name'], "6/5 (金)", actions, special_points, feedback, q1, q2, q3
+                        ):
+                            st.session_state.user_info['total_co2'] += special_points
+                            if 'history_dict' not in st.session_state.user_info:
+                                st.session_state.user_info['history_dict'] = {}
+                            st.session_state.user_info['history_dict']["6/5 (金)"] = actions
                             
-                            if save_daily_challenge(
-                                user['id'], user['name'], "6/5 (金)", actions, special_points, feedback, q1, q2, q3
-                            ):
-                                st.session_state.user_info['total_co2'] += special_points
-                                if 'history_dict' not in st.session_state.user_info:
-                                    st.session_state.user_info['history_dict'] = {}
-                                st.session_state.user_info['history_dict']["6/5 (金)"] = actions
-                                
-                                st.balloons()
-                                st.success(f"回答ありがとう！ {special_points}g ゲット！\nあなたは「10,000人チャレンジ」のひとりとして認定されました！")
-                                time.sleep(3)
-                                st.rerun()
+                            st.balloons()
+                            st.success(f"回答ありがとう！ {special_points}g ゲット！\nあなたは「10,000人チャレンジ」のひとりとして認定されました！")
+                            time.sleep(3)
+                            st.rerun()
 
     st.markdown("---")
     
