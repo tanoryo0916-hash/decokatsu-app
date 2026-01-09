@@ -5,7 +5,7 @@ from google.oauth2.service_account import Credentials
 import time
 import os
 import base64
-import random  # ランダム表示用に追加
+import random
 
 # --- 真っ白画面回避のための安全策 ---
 try:
@@ -384,11 +384,12 @@ def login_screen():
     st.markdown('<div class="main-title">🍑 おかやまデコ活チャレンジ</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-title">目指せ！岡山県で10,000人のエコヒーロー！</div>', unsafe_allow_html=True)
 
-    with st.expander("❓ さいしょのミッション：おうちの人に聞いてみよう！（ここをクリック）", expanded=False):
+    # === ★ デコ活説明コーナー（親子で学ぶフロー） ===
+    with st.expander("🔰 最初のミッション：おうちの人と「デコ活」を知ろう！（ここをクリック）", expanded=False):
         
         st.markdown("""
         <div class="kids-action">
-            📢 おうちの人を呼んできて、<br>いっしょに この下の画面を見てね！
+            📢 チャレンジを はじめる 前（まえ）に、<br>おうちの 人（ひと）と 一緒（いっしょ）に <br>「デコ活」って なにか 見（み）てみよう！
         </div>
         """, unsafe_allow_html=True)
 
