@@ -3,135 +3,198 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import datetime
+import time
 
 # ==========================================
-#  1. 設定
+#  1. 設定とセキュリティ
 # ==========================================
-st.set_page_config(page_title="ガラポン受付システム", page_icon="🎰", layout="wide")
+st.set_page_config(
+    page_title="ガラポン受付システム",
+    page_icon="🎰",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# Google Sheets 接続 (app.pyと同じ)
+# CSSでデザイン調整（見やすくする）
+st.markdown("""
+<style>
+    .big-font { font-size: 24px !important; font-weight: bold; }
+    .success-status { color: green; font-weight: bold; font-size: 18px; }
+    .warning-status { color: red; font-weight: bold; font-size: 18px; }
+    div[data-testid="stMetricValue"] { font-size: 36px; color: #E65100; }
+</style>
+""", unsafe_allow_html=True)
+
+# Google Sheets 接続設定
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
 @st.cache_resource
 def get_connection():
     try:
+        # Streamlit CloudのSecretsまたはローカルのsecrets.tomlから読み込み
         credentials = Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"], scopes=SCOPE
+            st.secrets["gcp_service_account"],
+            scopes=SCOPE
         )
         client = gspread.authorize(credentials)
         return client
     except Exception as e:
-        st.error(f"接続エラー: {e}")
+        st.error(f"❌ データベース接続エラー: {e}")
         return None
 
-# データ取得＆集計（ここがポイント！）
-def fetch_aggregated_data():
+# ==========================================
+#  2. データ処理関数
+# ==========================================
+
+# データの取得と集計（キャッシュは短めに設定して最新状態を保つ）
+def fetch_data():
     client = get_connection()
     if not client: return pd.DataFrame()
     
-    sheet = client.open("decokatsu_db").sheet1
-    data = sheet.get_all_records()
-    
-    if not data: return pd.DataFrame()
-    
-    df = pd.DataFrame(data)
-    
-    # 数値変換
-    df['CO2削減量'] = pd.to_numeric(df['CO2削減量'], errors='coerce').fillna(0)
-    
-    # IDごとに集計（ポイント合計、最新の名前、実施項目のリスト化）
-    # ※ ID形式: 学校名_学年_組_番号
-    agg_df = df.groupby('ID').agg({
-        'ニックネーム': 'last', # 最新のニックネーム
-        'CO2削減量': 'sum',     # 合計ポイント
-        '実施項目': lambda x: ", ".join([str(v) for v in x if v]) # 履歴を結合
-    }).reset_index()
-    
-    # 「ガラポン済」かどうか判定
-    agg_df['抽選状況'] = agg_df['実施項目'].apply(lambda x: '✅ 済み' if 'ガラポン済' in x else '未実施')
-    
-    return agg_df
+    try:
+        sheet = client.open("decokatsu_db").sheet1
+        data = sheet.get_all_records()
+        
+        if not data: return pd.DataFrame()
+        
+        df = pd.DataFrame(data)
+        
+        # 数値変換（エラー回避）
+        df['CO2削減量'] = pd.to_numeric(df['CO2削減量'], errors='coerce').fillna(0)
+        
+        # IDごとに集計
+        # 学校名やクラスはIDに含まれている前提（ID形式: 学校名_学年_組_番号）
+        agg_df = df.groupby('ID').agg({
+            'ニックネーム': 'last', # 最新の名前を採用
+            'CO2削減量': 'sum',     # ポイント合計
+            '実施項目': lambda x: ", ".join([str(v) for v in x if v]) # 履歴を結合
+        }).reset_index()
+        
+        # 「ガラポン済」判定
+        agg_df['抽選状況'] = agg_df['実施項目'].apply(lambda x: '✅ 済み' if 'ガラポン済' in x else '未実施')
+        
+        return agg_df
+        
+    except Exception as e:
+        st.error(f"データ取得エラー: {e}")
+        return pd.DataFrame()
 
-# ガラポン実施を記録する関数
+# ガラポン実施の記録
 def mark_lottery_done(user_id, nickname):
     client = get_connection()
-    sheet = client.open("decokatsu_db").sheet1
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if not client: return False
     
-    # 抽選済みログを追記 (ポイント0で記録)
-    # [日時, ID, 名前, 対象日付, 項目, ポイント, メモ, q1, q2, q3]
-    sheet.append_row([now, user_id, nickname, "会場受付", "ガラポン済", 0, "現地抽選完了", "", "", ""])
-    st.cache_data.clear() # キャッシュクリアして再読み込み
+    try:
+        sheet = client.open("decokatsu_db").sheet1
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 記録用行を追加（ポイントは0で記録し、実施項目に「ガラポン済」を入れる）
+        # 列順: [日時, ID, 名前, 対象日付, 項目, ポイント, メモ, q1, q2, q3]
+        sheet.append_row([now, user_id, nickname, "会場受付", "ガラポン済", 0, "現地抽選完了", "", "", ""])
+        return True
+    except Exception as e:
+        st.error(f"書き込みエラー: {e}")
+        return False
 
 # ==========================================
-#  2. 画面レイアウト
+#  3. アプリ画面構成
 # ==========================================
+
 st.title("🎰 おかやまデコ活フェス ガラポン受付")
+st.markdown("参加者の「学校名」または「お名前」を聞いて検索してください。")
 
-# --- 検索エリア ---
-st.markdown("### 🔍 参加者をさがす")
-col1, col2, col3 = st.columns([2, 1, 1])
-with col1:
-    search_text = st.text_input("学校名 または お名前 で検索", placeholder="例：倉敷、たろう")
+# データ読み込み（リロードボタン付き）
+col_r1, col_r2 = st.columns([8, 2])
+with col_r2:
+    if st.button("🔄 データを最新にする"):
+        st.cache_data.clear()
+        st.rerun()
 
-# データ読み込み
-df = fetch_aggregated_data()
+df = fetch_data()
 
 if not df.empty:
-    # --- フィルタリング ---
-    if search_text:
-        # 学校名(IDに含まれる) または ニックネーム で検索
-        filtered_df = df[
-            df['ID'].str.contains(search_text, na=False) | 
-            df['ニックネーム'].str.contains(search_text, na=False)
-        ]
-    else:
-        filtered_df = df
+    # --- 🔍 検索エリア ---
+    with st.container():
+        st.markdown("### 1. 参加者をさがす")
+        search_query = st.text_input("検索キーワード（学校名、名前、IDなど）", placeholder="例：倉敷、たろう")
 
-    # --- 一覧表示 ---
-    st.dataframe(
-        filtered_df[['ID', 'ニックネーム', 'CO2削減量', '抽選状況']],
-        column_config={
-            "CO2削減量": st.column_config.NumberColumn("合計CO2 (g)", format="%d g"),
-        },
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # --- 個別操作エリア ---
-    st.markdown("---")
-    st.markdown("### 🎟 抽選処理")
+    # --- 📋 検索結果リスト ---
+    target_row = None
     
-    # セレクトボックスで対象者を選択（検索結果があればそれに絞る）
-    target_list = filtered_df['ID'].tolist()
-    if target_list:
-        selected_id = st.selectbox("対象者を選択してください", target_list, format_func=lambda x: f"{x} : {filtered_df[filtered_df['ID']==x]['ニックネーム'].values[0]}")
+    if search_query:
+        # キーワードで絞り込み
+        filtered_df = df[
+            df['ID'].str.contains(search_query, na=False) | 
+            df['ニックネーム'].str.contains(search_query, na=False)
+        ]
         
-        target_row = filtered_df[filtered_df['ID'] == selected_id].iloc[0]
+        if len(filtered_df) == 0:
+            st.warning("見つかりませんでした。")
+        else:
+            # 選択肢の作成（IDと名前を表示）
+            options = filtered_df['ID'].tolist()
+            labels = {row['ID']: f"{row['ID']} : {row['ニックネーム']} 様 ({row['CO2削減量']}g)" for index, row in filtered_df.iterrows()}
+            
+            selected_id = st.selectbox(
+                "該当する参加者を選んでください", 
+                options, 
+                format_func=lambda x: labels[x]
+            )
+            
+            # 選択された人のデータを取得
+            target_row = df[df['ID'] == selected_id].iloc[0]
+
+    # --- 🎟 操作エリア（対象者が選ばれたら表示） ---
+    if target_row is not None:
+        st.markdown("---")
+        st.markdown("### 2. 抽選チェック")
         
         col_info, col_action = st.columns([1, 1])
         
+        # 左側：ステータス表示
         with col_info:
-            st.info(f"**{target_row['ニックネーム']}** さんのデータ")
-            st.metric("現在の合計ポイント", f"{target_row['CO2削減量']} g")
+            st.markdown(f"<div class='big-font'>{target_row['ニックネーム']} 様</div>", unsafe_allow_html=True)
+            st.caption(f"ID: {target_row['ID']}")
             
-            # 抽選回数の計算（例：500gで1回、1000gで2回など）
-            lottery_count = int(target_row['CO2削減量'] // 500) 
-            st.write(f"👉 抽選可能回数（500g毎）： **{lottery_count} 回**")
-
-        with col_action:
-            if "済み" in target_row['抽選状況']:
-                st.warning("⚠️ この参加者はすでにガラポンを回しています。")
-            elif target_row['CO2削減量'] < 500:
-                st.error("ポイントが足りません（目標500g）")
+            total_points = int(target_row['CO2削減量'])
+            st.metric("現在の合計ポイント", f"{total_points:,} g")
+            
+            # 抽選条件判定（例: 500gで1回）
+            REQUIRED_POINTS = 500
+            
+            if total_points >= REQUIRED_POINTS:
+                st.success(f"✨ 抽選条件クリア！ ({REQUIRED_POINTS}g以上)")
             else:
-                if st.button("✅ ガラポン完了として記録する", type="primary"):
-                    mark_lottery_done(selected_id, target_row['ニックネーム'])
-                    st.success(f"{target_row['ニックネーム']} さんの抽選を記録しました！")
-                    time.sleep(2)
-                    st.rerun()
-    else:
-        st.write("検索結果がありません。")
+                st.error(f"あと {REQUIRED_POINTS - total_points}g 足りません。")
+
+        # 右側：アクションボタン
+        with col_action:
+            status = target_row['抽選状況']
+            
+            if "済み" in status:
+                st.markdown("<div class='warning-status'>⚠️ すでに抽選済みです</div>", unsafe_allow_html=True)
+                st.info("※重複参加に注意してください")
+            
+            elif total_points < REQUIRED_POINTS:
+                st.markdown("<div class='warning-status'>❌ ポイント不足</div>", unsafe_allow_html=True)
+                st.write("まだ抽選できません。")
+                
+            else:
+                st.markdown("<div class='success-status'>✅ 抽選可能です</div>", unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # 誤操作防止のため、確認してから実行
+                with st.popover("🎟 抽選済みにする（押下）"):
+                    st.write("本当に「抽選完了」として記録しますか？")
+                    if st.button("はい、記録します", type="primary"):
+                        with st.spinner("記録中..."):
+                            if mark_lottery_done(target_row['ID'], target_row['ニックネーム']):
+                                st.success("記録しました！")
+                                time.sleep(1)
+                                st.cache_data.clear() # データ更新
+                                st.rerun()            # 画面リロード
+                            else:
+                                st.error("エラーが発生しました。もう一度試してください。")
 
 else:
-    st.warning("データがまだありません。")
+    st.info("データがまだありません。")
