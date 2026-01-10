@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定（スマホ最適化＆ヘッダー修正版） ---
+# --- CSS設定（スマホ最適化＆ヘッダー見切れ修正版） ---
 st.markdown("""
 <style>
     /* 全体のフォント設定 */
@@ -33,9 +33,9 @@ st.markdown("""
         color: #333;
     }
 
-    /* --- 📱 Streamlit標準の余白調整（ヘッダー見切れ防止） --- */
+    /* --- 📱 Streamlit標準の余白調整（ヘッダー見切れ防止・強化版） --- */
     .block-container {
-        padding-top: 1rem !important; /* ここで上部の余白を確保 */
+        padding-top: 3.5rem !important; /* ★ここを3.5remに増やして余白を確保 */
         padding-bottom: 3rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
