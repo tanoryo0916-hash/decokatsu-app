@@ -25,9 +25,9 @@ st.markdown("""
         background-color: #FFF3E0; /* 背景：薄いオレンジ */
     }
 
-    /* ストリームリットの標準余白削除 */
+    /* ストリームリットの標準余白調整（上部の見切れを修正） */
     .block-container {
-        padding-top: 0 !important;
+        padding-top: 1rem !important; /* ここを0から1remに変更 */
         padding-bottom: 3rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -38,9 +38,9 @@ st.markdown("""
     .header-area {
         background: linear-gradient(135deg, #FF6F00 0%, #FFCA28 100%);
         padding: 30px 20px 40px 20px;
-        border-radius: 0 0 30px 30px;
+        border-radius: 20px; /* 丸みを少し調整 */
         text-align: center;
-        margin: 0 -1rem 20px -1rem;
+        margin-bottom: 25px; /* 下の余白を調整 */
         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         color: white;
         position: relative;
@@ -107,7 +107,6 @@ st.markdown("""
         background-color: #FAFAFA; padding: 10px; border-radius: 8px; margin-bottom: 5px;
         border: 1px solid #EEEEEE; width: 100%;
     }
-    /* チェックボックスのタップ領域を調整 */
     div[data-baseweb="checkbox"] {
         margin-bottom: 8px;
     }
@@ -294,11 +293,10 @@ else:
             </p>
         """, unsafe_allow_html=True)
         
-        # チェックボックスを2列で配置（スマホで見やすく）
+        # チェックボックスを2列で配置
         selected_booths = []
         cols = st.columns(2)
         for i, booth_name in enumerate(BOOTH_LIST):
-            # 偶数番目は左、奇数番目は右のカラムへ
             if cols[i % 2].checkbox(booth_name, key=f"booth_{i}"):
                 selected_booths.append(booth_name)
         
