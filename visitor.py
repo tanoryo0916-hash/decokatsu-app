@@ -9,7 +9,7 @@ import uuid
 #  1. 設定＆デザイン
 # ==========================================
 st.set_page_config(
-    page_title="おかやまデコ活宣言",
+    page_title="おかやまデコ活宣言＆アンケート",
     page_icon="🌿",
     layout="centered",
     initial_sidebar_state="collapsed"
@@ -33,6 +33,7 @@ st.markdown("""
         color: white;
         border: none;
         box-shadow: 0 4px 10px rgba(67, 160, 71, 0.3);
+        margin-top: 20px;
     }
     /* ヘッダー画像エリア */
     .header-area {
@@ -44,7 +45,7 @@ st.markdown("""
         border-bottom: 4px solid #C8E6C9;
     }
     .main-title {
-        font-size: 24px;
+        font-size: 22px;
         font-weight: 900;
         color: #2E7D32;
         margin-bottom: 5px;
@@ -73,6 +74,17 @@ st.markdown("""
         font-weight: bold;
         margin: 10px 0;
     }
+    /* フォームのセクション見出し */
+    .section-header {
+        font-weight: bold;
+        color: #1B5E20;
+        background-color: #F1F8E9;
+        padding: 8px 15px;
+        border-radius: 5px;
+        margin-top: 20px;
+        margin-bottom: 10px;
+        border-left: 5px solid #43A047;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -94,7 +106,7 @@ def get_connection():
         st.error(f"接続エラー: {e}")
         return None
 
-def save_declaration(nickname, action_text):
+def save_visitor_data(nickname, action_text, q1_score, q2_text):
     client = get_connection()
     if not client: return False
 
@@ -102,12 +114,13 @@ def save_declaration(nickname, action_text):
         sheet = client.open("decokatsu_db").sheet1
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # 一般参加用のID生成 (VISitor_日時_ランダム)
+        # 一般参加用のID生成
         user_id = f"VIS_{datetime.datetime.now().strftime('%H%M%S')}_{str(uuid.uuid4())[:4]}"
         
         # 保存 (学校名は「一般参加」とする)
         # 列順: [日時, ID, 名前, 対象日付, 項目, ポイント, メモ, q1, q2, q3]
-        sheet.append_row([now, user_id, nickname, "一般来場", "デコ活宣言", 0, action_text, "", "", ""])
+        # q1:満足度, q2:感想
+        sheet.append_row([now, user_id, nickname, "一般来場", "デコ活宣言・アンケート", 0, action_text, q1_score, q2_text, ""])
         return True
     except Exception as e:
         st.error(f"送信エラー: {e}")
@@ -117,7 +130,7 @@ def save_declaration(nickname, action_text):
 #  3. 画面構成
 # ==========================================
 
-# セッション状態の管理（画面更新してもチケットを消さないため）
+# セッション状態の管理
 if 'submitted' not in st.session_state:
     st.session_state['submitted'] = False
 if 'user_name' not in st.session_state:
@@ -126,8 +139,8 @@ if 'user_name' not in st.session_state:
 # --- ヘッダー ---
 st.markdown("""
 <div class="header-area">
-    <div class="main-title">🌿 おかやまデコ活宣言</div>
-    <div style="font-size:14px; font-weight:bold;">みんなで地球にいいこと、始めよう！</div>
+    <div class="main-title">🌿 デコ活宣言＆アンケート</div>
+    <div style="font-size:14px; font-weight:bold;">回答してガラポン抽選に参加しよう！</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -138,7 +151,7 @@ if st.session_state['submitted']:
     st.markdown(f"""
     <div class="ticket-card">
         <div class="ticket-title">🎟 ガラポン参加チケット</div>
-        <p style="font-weight:bold; margin-top:10px;">デコ活宣言 ありがとう！</p>
+        <p style="font-weight:bold; margin-top:10px;">ご協力ありがとうございました！</p>
         <div class="ticket-name">{st.session_state['user_name']} 様</div>
         <div style="font-size:14px; margin-top:10px;">
             この画面をスタッフに見せて<br>ガラポン抽選に参加してね！
@@ -157,11 +170,13 @@ if st.session_state['submitted']:
 
 else:
     # === 入力フォーム ===
-    st.info("👇 ここに入力すると、ガラポン抽選に参加できるよ！")
+    st.info("👇 2つのステップを入力してね！")
 
     with st.form("visitor_form"):
+        st.markdown('<div class="section-header">① あなたについて</div>', unsafe_allow_html=True)
         nickname = st.text_input("お名前（ニックネーム）", placeholder="例：ももたろう")
         
+        st.markdown('<div class="section-header">② デコ活宣言</div>', unsafe_allow_html=True)
         # 宣言の選択肢
         options = [
             "エコバッグを持ち歩きます",
@@ -173,14 +188,20 @@ else:
             "水を大切に使います",
             "その他（自由入力）"
         ]
-        declaration = st.selectbox("あなたの「デコ活宣言」を選んでね", options)
+        declaration = st.selectbox("今日から始める「デコ活」を選んでね", options)
         
         # その他を選んだ場合
         custom_text = ""
         if declaration == "その他（自由入力）":
             custom_text = st.text_input("宣言したいことを書いてね")
         
-        submitted = st.form_submit_button("宣言して ガラポンに参加！")
+        st.markdown('<div class="section-header">③ ブースアンケート</div>', unsafe_allow_html=True)
+        q1 = st.radio("Q1. ブースを回ってみて、どうでしたか？", 
+                      ["5：とても楽しかった！", "4：楽しかった", "3：ふつう", "2：あまり...", "1：よくなかった"])
+        
+        q2 = st.text_area("Q2. 感想や、印象に残ったことがあれば教えてください", height=80, placeholder="自由記述")
+
+        submitted = st.form_submit_button("送信して ガラポンに参加！")
 
         if submitted:
             if not nickname:
@@ -189,7 +210,7 @@ else:
                 final_action = custom_text if custom_text else declaration
                 
                 with st.spinner("送信中..."):
-                    if save_declaration(nickname, final_action):
+                    if save_visitor_data(nickname, final_action, q1, q2):
                         st.session_state['submitted'] = True
                         st.session_state['user_name'] = nickname
                         st.rerun()
