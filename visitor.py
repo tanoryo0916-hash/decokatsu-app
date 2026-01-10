@@ -22,7 +22,7 @@ st.markdown("""
     html, body, [class*="css"] {
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         color: #333;
-        background-color: #FFF3E0; /* 背景：薄いオレンジ（ワクワク感） */
+        background-color: #FFF3E0; /* 背景：薄いオレンジ */
     }
 
     /* ストリームリットの標準余白削除 */
@@ -63,7 +63,7 @@ st.markdown("""
         background-color: #ffffff;
         padding: 20px 15px;
         border-radius: 15px;
-        box-shadow: 0 4px 0px #E0E0E0; /* 立体的な影 */
+        box-shadow: 0 4px 0px #E0E0E0;
         border: 2px solid #fff;
         margin-bottom: 25px;
         position: relative;
@@ -102,16 +102,14 @@ st.markdown("""
         font-size: 16px !important; background-color: #FAFAFA; 
     }
     
-    /* ラジオボタン調整 */
-    div[role="radiogroup"] label {
-        background-color: #FAFAFA; padding: 12px 10px; border-radius: 8px; margin-bottom: 5px;
+    /* ラジオボタン＆チェックボックス調整 */
+    div[role="radiogroup"] label, div[data-baseweb="checkbox"] label {
+        background-color: #FAFAFA; padding: 10px; border-radius: 8px; margin-bottom: 5px;
         border: 1px solid #EEEEEE; width: 100%;
     }
-    div[role="radiogroup"] label:hover { background-color: #FFF8E1; border-color: #FFCC80; }
-
-    /* マルチセレクト（ブース選択）の調整 */
-    span[data-baseweb="tag"] {
-        background-color: #FFE0B2; font-weight: bold; color: #E65100;
+    /* チェックボックスのタップ領域を調整 */
+    div[data-baseweb="checkbox"] {
+        margin-bottom: 8px;
     }
 
     /* --- コンプリートボタン --- */
@@ -155,14 +153,14 @@ SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis
 # ★ここに実際のブース名を記入してください★
 BOOTH_LIST = [
     "次世代EV車展示",
-    "ソーラーカー工作体験",
-    "古着リメイクワークショップ",
+    "ソーラーカー工作",
+    "古着リメイク",
     "地元野菜マルシェ",
-    "省エネ家電クイズ大会",
-    "廃油キャンドル作り",
-    "海洋プラスチックゴミ展示",
+    "省エネ家電クイズ",
+    "廃油キャンドル",
+    "海洋プラゴミ展示",
     "水素エネルギー体験",
-    "フードドライブ受付",
+    "フードドライブ",
     "企業ブースA",
     "企業ブースB",
     "その他"
@@ -193,8 +191,7 @@ def save_visitor_data(nickname, gender, age, location, action_text, visited_boot
         # メモ欄に属性と宣言を集約
         memo_content = f"【属性】{age}/{gender}/{location}\n【宣言】{action_text}"
         
-        # 保存 (ブース一覧は最後の列へ)
-        # 列順: [日時, ID, 名前, 対象日付, 項目, ポイント, メモ, Q1(満足度), Q2(感想), Q3(回ったブース)]
+        # 保存
         sheet.append_row([now, user_id, nickname, "一般来場", "ミッションコンプリート", 0, memo_content, q1_score, q2_text, visited_booths_str])
         return True
     except Exception as e:
@@ -223,7 +220,7 @@ if not st.session_state['submitted']:
 
 # --- メイン処理 ---
 if st.session_state['submitted']:
-    # === 送信完了画面（チケット） ===
+    # === 送信完了画面 ===
     st.balloons()
     st.markdown("""
     <div class="header-area" style="background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%); padding-bottom:40px;">
@@ -286,23 +283,26 @@ else:
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('<div class="next-arrow">▼</div>', unsafe_allow_html=True)
 
-        # MISSION 3 (ブース選択)
+        # MISSION 3 (ブース選択・チェックボックス形式)
         st.markdown("""
         <div class="mission-card">
             <div class="mission-badge">MISSION 3</div>
             <div class="mission-title">👣 ブースを4つ回れ！</div>
             <p style="font-size:13px; color:#555; line-height:1.5;">
-                回ったブースをリストから選んでね。<br>
-                <strong>4つ以上選ぶとクリア</strong>になるよ！
+                回ったブースにチェックを入れてね。<br>
+                <strong>4つ以上チェック</strong>するとクリアだよ！
             </p>
         """, unsafe_allow_html=True)
         
-        selected_booths = st.multiselect(
-            "回ったブースを選んでね（タップ）",
-            BOOTH_LIST,
-            placeholder="ここをタップして選択..."
-        )
+        # チェックボックスを2列で配置（スマホで見やすく）
+        selected_booths = []
+        cols = st.columns(2)
+        for i, booth_name in enumerate(BOOTH_LIST):
+            # 偶数番目は左、奇数番目は右のカラムへ
+            if cols[i % 2].checkbox(booth_name, key=f"booth_{i}"):
+                selected_booths.append(booth_name)
         
+        st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
         booth_count = len(selected_booths)
         if booth_count >= 4:
             st.markdown(f"✅ **{booth_count}個** 回った！ <span style='color:green; font-weight:bold;'>条件クリア！</span>", unsafe_allow_html=True)
