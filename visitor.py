@@ -25,9 +25,9 @@ st.markdown("""
         background-color: #FFF3E0; /* 背景：薄いオレンジ */
     }
 
-    /* ストリームリットの標準余白調整（ヘッダー見切れ修正） */
+    /* ストリームリットの標準余白調整（ヘッダー見切れ防止・強化版） */
     .block-container {
-        padding-top: 1rem !important; /* ここを0から1remに変更して余白確保 */
+        padding-top: 3.5rem !important; /* ★ここを大幅に増やしました（約56px確保） */
         padding-bottom: 3rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
