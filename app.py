@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定（スマホ最適化＆おしゃれ版） ---
+# --- CSS設定（スマホ最適化強化版） ---
 st.markdown("""
 <style>
     /* 全体のフォント設定 */
@@ -36,8 +36,8 @@ st.markdown("""
     /* --- 🍑 ボタンのデザイン --- */
     .stButton>button {
         width: 100%;
-        height: 70px; /* スマホでも押しやすい高さ */
-        font-size: 20px !important;
+        height: 70px;
+        font-size: 22px !important;
         border-radius: 35px;
         font-weight: 900;
         border: none;
@@ -307,7 +307,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* --- 🍑 タイトルデザイン（PC標準） --- */
+    /* --- 🍑 タイトルデザイン --- */
     .main-title {
         text-align: center;
         font-size: 32px;
@@ -376,7 +376,7 @@ st.markdown("""
     div[data-baseweb="tab-list"] {
         gap: 8px;
         margin-bottom: 10px;
-        flex-wrap: wrap; /* スマホでタブを折り返す */
+        flex-wrap: wrap;
     }
     button[data-baseweb="tab"] {
         background-color: #FFF3E0;
@@ -387,7 +387,7 @@ st.markdown("""
         padding: 12px 10px;
         font-size: 14px;
         transition: all 0.2s;
-        flex-grow: 1; /* スマホで幅いっぱいに */
+        flex-grow: 1;
     }
     button[data-baseweb="tab"]:hover {
         background-color: #FFE0B2;
@@ -404,32 +404,23 @@ st.markdown("""
        📱 スマホ用レスポンシブ対応 (画面幅600px以下)
        ========================================= */
     @media only screen and (max-width: 600px) {
-        /* タイトルを小さく */
         .main-title { font-size: 24px !important; }
         .hero-name { font-size: 24px !important; }
-        
-        /* 統計数字を小さく */
         .stat-num { font-size: 24px !important; }
         .special-hero-num { font-size: 40px !important; }
-        
-        /* カードの余白を詰める */
         div[data-testid="stForm"] { padding: 15px !important; }
         .hero-card, .mission-box, .decokatsu-intro { padding: 15px !important; }
-        
-        /* カスタムヘッダー調整 */
         .custom-header { height: 180px !important; }
         .header-title-main { font-size: 28px !important; }
         .header-title-sub { font-size: 12px !important; padding: 5px 10px !important; }
-        
-        /* ボタン文字サイズ調整 */
         .stButton>button { font-size: 18px !important; height: 60px !important; }
-        
-        /* 学校名などの補助テキスト */
         .school-suffix { font-size: 14px; padding-top: 40px; }
-        
-        /* フェス告知 */
         .event-title { font-size: 20px !important; }
         .event-date { font-size: 14px !important; }
+        
+        /* 表の文字サイズを小さくする */
+        div[data-testid="stDataEditor"] { font-size: 12px !important; }
+        th, td { padding: 5px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -563,7 +554,7 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         st.error(f"保存失敗: {e}")
         return False
 
-# ★ イベント誘導（チラシ表示）関数（修正済み：スマホ文言削除）
+# ★ イベント誘導（チラシ表示）関数
 def show_event_promo():
     st.markdown("""
     <div class="event-promo-box">
@@ -660,7 +651,7 @@ def login_screen():
     </div>
     """, unsafe_allow_html=True)
 
-    # === ★ デコ活説明コーナー（親子で学ぶフロー） ===
+    # === ★ デコ活説明コーナー ===
     with st.expander("🔰 最初のミッション：おうちの人と「デコ活」を知ろう！（ここをクリック）", expanded=False):
         
         st.markdown("""
@@ -903,41 +894,50 @@ def main_screen():
     else:
         target_dates = ["6/1 (月)", "6/2 (火)", "6/3 (水)", "6/4 (木)"]
         
-        # --- ひらがな対応アクション定義 ---
+        # --- チェック項目の短縮名リスト（スマホで見やすくするため） ---
         action_master = {
             "電気": {
+                "short": "① 電気",
                 "label": "① 💡 だれもいない へやの でんき をけした！",
                 "point": 50,
                 "help": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"
             },
             "食事": {
+                "short": "② 食事",
                 "label": "② 🍚 ごはんを のこさず たべた！",
                 "point": 100,
                 "help": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"
             },
             "水": {
+                "short": "③ 水",
                 "label": "③ 🚰 水（みず）を 大切（たいせつ）に つかった！",
                 "point": 30,
                 "help": "例：歯みがきの間コップを使って水を止めた、顔を洗うとき出しっぱなしにしなかった（CO2削減 -30g）"
             },
             "分別": {
+                "short": "④ 分別",
                 "label": "④ ♻️ ゴミを 正（ただ）しく わけた！",
                 "point": 80,
                 "help": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"
             },
             "家族": {
+                "short": "⑤ 家族",
                 "label": "⑤ 👨‍👩‍👧 おうちの 人（ひと）も いっしょに できた！",
                 "point": 50,
                 "help": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"
             }
         }
         
-        label_to_key = {v["label"]: k for k, v in action_master.items()}
+        # マッピング辞書の作成
+        short_to_key = {v["short"]: k for k, v in action_master.items()}
+        key_to_short = {k: v["short"] for k, v in action_master.items()}
         categories = list(action_master.keys())
         
+        # データフレーム用のデータ作成
         df_data = {date: [False]*len(categories) for date in target_dates}
         history = user.get('history_dict', {})
         
+        # 履歴データの反映
         for date_col in target_dates:
             if date_col in history:
                 done_actions = history[date_col]
@@ -945,16 +945,17 @@ def main_screen():
                     if key in done_actions:
                          df_data[date_col][i] = True
 
-        display_labels = [action_master[k]["label"] for k in categories]
+        # インデックス（行の見出し）を短縮名にする
+        display_labels = [action_master[k]["short"] for k in categories]
         df = pd.DataFrame(df_data, index=display_labels)
 
         edited_df = st.data_editor(
             df,
             column_config={
-                "6/1 (月)": st.column_config.CheckboxColumn("6/1 (月)", default=False),
-                "6/2 (火)": st.column_config.CheckboxColumn("6/2 (火)", default=False),
-                "6/3 (水)": st.column_config.CheckboxColumn("6/3 (水)", default=False),
-                "6/4 (木)": st.column_config.CheckboxColumn("6/4 (木)", default=False),
+                "6/1 (月)": st.column_config.CheckboxColumn("6/1(月)", default=False),
+                "6/2 (火)": st.column_config.CheckboxColumn("6/2(火)", default=False),
+                "6/3 (水)": st.column_config.CheckboxColumn("6/3(水)", default=False),
+                "6/4 (木)": st.column_config.CheckboxColumn("6/4(木)", default=False),
             },
             disabled=[], 
             hide_index=False,
@@ -974,13 +975,14 @@ def main_screen():
                 current_history = history.copy()
 
                 for date_col in target_dates:
-                    current_checks = edited_df[date_col]
+                    current_checks = edited_df[date_col] # これはSeries (index=short, value=bool)
                     actions_to_save = []
                     day_points = 0
                     
-                    for label, is_checked in current_checks.items():
+                    # 短縮名からキーに戻して保存リストを作る
+                    for short_label, is_checked in current_checks.items():
                         if is_checked:
-                            key = label_to_key[label]
+                            key = short_to_key[short_label]
                             actions_to_save.append(key)
                             day_points += action_master[key]["point"]
                     
@@ -1026,7 +1028,6 @@ def main_screen():
         with st.expander("🌿 6/5 環境の日 スペシャルミッション（完了！）", expanded=False):
             st.success("✨ 特別ミッションクリア済み！認定証が発行されています。")
     else:
-        # 常時表示（ただし初期状態は閉じておく）
         with st.expander("🌿 6/5 環境の日 スペシャルミッション（アンケート）", expanded=False):
             st.markdown("※ 6/5(金)になったら、ここに入力してね！（それまでは楽しみに待っててね）")
             
