@@ -6,43 +6,101 @@ import time
 import uuid
 
 # ==========================================
-#  1. 設定＆デザイン
+#  1. 設定＆デザイン（スマホ特化）
 # ==========================================
 st.set_page_config(
-    page_title="おかやまデコ活宣言＆アンケート",
+    page_title="デコ活宣言",
     page_icon="🌿",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定（スマホ最適化・チケット風デザイン） ---
+# --- CSS設定（スマホ完全最適化） ---
 st.markdown("""
 <style>
+    /* ベースフォント設定 */
     html, body, [class*="css"] {
-        font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         color: #333;
+        background-color: #F1F8E9; /* 背景：薄い黄緑 */
     }
-    /* ボタン */
+
+    /* --- 📱 Streamlit標準の余白を削除（スマホ画面を広く使うため） --- */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 3rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max_width: 100% !important;
+    }
+
+    /* --- カードデザイン --- */
+    .step-card {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border-left: 6px solid #43A047; /* 左線でアクセント */
+        margin-bottom: 15px;
+    }
+
+    /* --- ステップバッジ --- */
+    .step-badge {
+        background-color: #43A047;
+        color: white;
+        padding: 3px 10px;
+        border-radius: 15px;
+        font-weight: bold;
+        font-size: 12px;
+        display: inline-block;
+        margin-bottom: 8px;
+        vertical-align: middle;
+    }
+    .step-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #2E7D32;
+        margin-left: 5px;
+        vertical-align: middle;
+    }
+
+    /* --- 入力フィールド（iPhoneのズーム防止のため16px以上） --- */
+    div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="textarea"] {
+        font-size: 16px !important;
+        background-color: #FAFAFA;
+    }
+    /* ラジオボタンのタップ領域拡大 */
+    div[role="radiogroup"] label {
+        padding: 10px 0; 
+        border-bottom: 1px solid #eee; /* 区切り線 */
+        width: 100%;
+    }
+
+    /* --- 送信ボタン（親指で押しやすいように大きく） --- */
     .stButton>button {
         width: 100%;
-        height: 60px;
+        height: 65px;
         font-size: 20px !important;
-        border-radius: 30px;
-        font-weight: bold;
-        background: linear-gradient(135deg, #43A047 0%, #66BB6A 100%);
+        border-radius: 15px;
+        font-weight: 900;
+        background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
         color: white;
         border: none;
-        box-shadow: 0 4px 10px rgba(67, 160, 71, 0.3);
-        margin-top: 20px;
+        box-shadow: 0 4px 10px rgba(245, 124, 0, 0.3);
+        margin-top: 10px;
     }
-    /* ヘッダー画像エリア */
+    .stButton>button:active {
+        transform: scale(0.98);
+    }
+
+    /* --- ヘッダーエリア --- */
     .header-area {
-        background-color: #E8F5E9;
-        padding: 20px;
+        background-color: #ffffff;
+        padding: 15px;
         border-radius: 0 0 20px 20px;
         text-align: center;
-        margin-bottom: 20px;
-        border-bottom: 4px solid #C8E6C9;
+        margin: -1rem -1rem 20px -1rem; /* 画面端まで広げる */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     .main-title {
         font-size: 22px;
@@ -50,40 +108,23 @@ st.markdown("""
         color: #2E7D32;
         margin-bottom: 5px;
     }
-    /* 完了チケット */
+
+    /* --- 完了チケット --- */
     .ticket-card {
         background: linear-gradient(135deg, #FFF9C4 0%, #FFF176 100%);
-        border: 4px dashed #FBC02D;
+        border: 3px dashed #FBC02D;
         border-radius: 15px;
-        padding: 20px;
+        padding: 25px 15px;
         text-align: center;
-        margin-top: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        position: relative;
-    }
-    .ticket-title {
-        font-size: 22px;
-        font-weight: 900;
-        color: #E65100;
-        border-bottom: 2px solid #E65100;
-        display: inline-block;
-        margin-bottom: 10px;
+        margin-top: 10px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
     .ticket-name {
         font-size: 28px;
-        font-weight: bold;
+        font-weight: 900;
         margin: 10px 0;
-    }
-    /* フォームのセクション見出し */
-    .section-header {
-        font-weight: bold;
-        color: #1B5E20;
-        background-color: #F1F8E9;
-        padding: 8px 15px;
-        border-radius: 5px;
-        margin-top: 20px;
-        margin-bottom: 10px;
-        border-left: 5px solid #43A047;
+        color: #333;
+        word-break: break-all; /* 長い名前での崩れ防止 */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -106,28 +147,27 @@ def get_connection():
         st.error(f"接続エラー: {e}")
         return None
 
-def save_visitor_data(nickname, action_text, q1_score, q2_text):
+def save_visitor_data(nickname, gender, age, location, action_text, q1_score, q2_text):
     client = get_connection()
     if not client: return False
 
     try:
         sheet = client.open("decokatsu_db").sheet1
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 一般参加用のID生成
         user_id = f"VIS_{datetime.datetime.now().strftime('%H%M%S')}_{str(uuid.uuid4())[:4]}"
         
-        # 保存 (学校名は「一般参加」とする)
-        # 列順: [日時, ID, 名前, 対象日付, 項目, ポイント, メモ, q1, q2, q3]
-        # q1:満足度, q2:感想
-        sheet.append_row([now, user_id, nickname, "一般来場", "デコ活宣言・アンケート", 0, action_text, q1_score, q2_text, ""])
+        # 属性と宣言をメモ欄にまとめる
+        memo_content = f"【属性】{age}/{gender}/{location}\n【宣言】{action_text}"
+        
+        # 保存
+        sheet.append_row([now, user_id, nickname, "一般来場", "デコ活宣言・アンケート", 0, memo_content, q1_score, q2_text, ""])
         return True
     except Exception as e:
         st.error(f"送信エラー: {e}")
         return False
 
 # ==========================================
-#  3. 画面構成
+#  3. 画面構成（スマホ最適化）
 # ==========================================
 
 # セッション状態の管理
@@ -137,27 +177,33 @@ if 'user_name' not in st.session_state:
     st.session_state['user_name'] = ""
 
 # --- ヘッダー ---
-st.markdown("""
-<div class="header-area">
-    <div class="main-title">🌿 デコ活宣言＆アンケート</div>
-    <div style="font-size:14px; font-weight:bold;">回答してガラポン抽選に参加しよう！</div>
-</div>
-""", unsafe_allow_html=True)
+if not st.session_state['submitted']:
+    st.markdown("""
+    <div class="header-area">
+        <div class="main-title">🌿 おかやまデコ活宣言</div>
+        <div style="font-size:13px; color:#666;">
+            3つのステップを入力して<br>
+            <strong>ガラポン抽選</strong> に参加しよう！
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # --- メイン処理 ---
 if st.session_state['submitted']:
-    # === 送信完了画面（抽選チケット） ===
+    # === 送信完了画面（チケット表示） ===
     st.balloons()
     st.markdown(f"""
     <div class="ticket-card">
-        <div class="ticket-title">🎟 ガラポン参加チケット</div>
-        <p style="font-weight:bold; margin-top:10px;">ご協力ありがとうございました！</p>
-        <div class="ticket-name">{st.session_state['user_name']} 様</div>
-        <div style="font-size:14px; margin-top:10px;">
-            この画面をスタッフに見せて<br>ガラポン抽選に参加してね！
+        <div style="font-size:20px; font-weight:bold; color:#E65100; border-bottom:2px solid #E65100; display:inline-block; margin-bottom:10px;">
+            🎟 ガラポン参加チケット
         </div>
-        <div style="font-size:12px; color:#555; margin-top:15px;">
-            {datetime.date.today().strftime('%Y年%m月%d日')} 発行
+        <p style="font-weight:bold; color:#5D4037; margin:0;">ご協力ありがとうございました！</p>
+        <div class="ticket-name">{st.session_state['user_name']} 様</div>
+        <div style="background-color:white; padding:10px; border-radius:8px; display:inline-block; font-weight:bold; font-size:14px; margin-top:10px;">
+            この画面をスタッフに見せてね！
+        </div>
+        <div style="font-size:11px; color:#888; margin-top:15px;">
+            {datetime.date.today().strftime('%Y年%m月%d日')}
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -170,54 +216,88 @@ if st.session_state['submitted']:
 
 else:
     # === 入力フォーム ===
-    st.info("👇 2つのステップを入力してね！")
-
     with st.form("visitor_form"):
-        st.markdown('<div class="section-header">① あなたについて</div>', unsafe_allow_html=True)
+        
+        # --- STEP 1: あなたについて ---
+        st.markdown("""
+        <div class="step-card">
+            <span class="step-badge">STEP 1</span><span class="step-title">あなたについて</span>
+        """, unsafe_allow_html=True)
+        
         nickname = st.text_input("お名前（ニックネーム）", placeholder="例：ももたろう")
         
-        st.markdown('<div class="section-header">② デコ活宣言</div>', unsafe_allow_html=True)
-        # 宣言の選択肢
-        options = [
-            "エコバッグを持ち歩きます",
-            "食べ残しをしません",
-            "こまめに電気を消します",
-            "冷房は28℃、暖房は20℃にします",
-            "なるべく歩いて移動します",
-            "マイボトルを使います",
-            "水を大切に使います",
-            "その他（自由入力）"
-        ]
-        declaration = st.selectbox("今日から始める「デコ活」を選んでね", options)
+        # スマホで幅を取らないよう2列配置
+        col1, col2 = st.columns(2)
+        with col1:
+            gender = st.selectbox("性別", ["男性", "女性", "その他・無回答"])
+        with col2:
+            age = st.selectbox("年代", [
+                "小学生未満", "小学生", "中学生", "高校生", "18〜19歳", 
+                "20代", "30代", "40代", "50代", "60代", "70代以上"
+            ])
+            
+        location = st.selectbox("お住まい", [
+            "倉敷市", "岡山市", "総社市", "玉野市", "笠岡市", "井原市", "浅口市", "高梁市", 
+            "新見市", "備前市", "瀬戸内市", "赤磐市", "真庭市", "美作市", "津山市", 
+            "その他の県内", "県外"
+        ])
         
-        # その他を選んだ場合
-        custom_text = ""
-        if declaration == "その他（自由入力）":
-            custom_text = st.text_input("宣言したいことを書いてね")
-        
-        st.markdown('<div class="section-header">③ ブースアンケート</div>', unsafe_allow_html=True)
-        q1 = st.radio("Q1. ブースを回ってみて、どうでしたか？", 
-                      ["5：とても楽しかった！", "4：楽しかった", "3：ふつう", "2：あまり...", "1：よくなかった"])
-        
-        q2 = st.text_area("Q2. 感想や、印象に残ったことがあれば教えてください", height=80, placeholder="自由記述")
+        st.markdown('</div>', unsafe_allow_html=True)
 
+        # --- STEP 2: デコ活宣言 ---
+        st.markdown("""
+        <div class="step-card">
+            <span class="step-badge">STEP 2</span><span class="step-title">デコ活宣言</span>
+            <p style="font-size:13px; color:#555; margin-top:5px; line-height:1.4;">
+                パネルをヒントに、<br>
+                <strong>「これなら自分もできそう！」</strong><br>
+                と思ったことを宣言してね。
+            </p>
+        """, unsafe_allow_html=True)
+        
+        declaration_text = st.text_area(
+            "宣言内容", 
+            placeholder="（例）パネルの「食品ロス削減」を見て、今日からご飯を残さず食べようと思いました！",
+            height=100,
+            label_visibility="collapsed"
+        )
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # --- STEP 3: アンケート ---
+        st.markdown("""
+        <div class="step-card">
+            <span class="step-badge">STEP 3</span><span class="step-title">感想</span>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<p style='font-weight:bold; font-size:14px; margin-bottom:5px;'>Q1. ブースは楽しかったですか？</p>", unsafe_allow_html=True)
+        q1 = st.radio("Q1", 
+                      ["5：とても楽しかった！", "4：楽しかった", "3：ふつう", "2：あまり...", "1：よくなかった"],
+                      label_visibility="collapsed")
+        
+        st.markdown("<p style='font-weight:bold; font-size:14px; margin-top:10px; margin-bottom:5px;'>Q2. ご感想（自由記述）</p>", unsafe_allow_html=True)
+        q2 = st.text_area("Q2", height=80, placeholder="気づいたことなどあれば教えてください", label_visibility="collapsed")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # --- 送信ボタン ---
         submitted = st.form_submit_button("送信して ガラポンに参加！")
 
         if submitted:
             if not nickname:
-                st.warning("お名前を入力してね！")
+                st.warning("お名前を入れてね！")
+            elif not declaration_text:
+                st.warning("宣言を書いてね！")
             else:
-                final_action = custom_text if custom_text else declaration
-                
                 with st.spinner("送信中..."):
-                    if save_visitor_data(nickname, final_action, q1, q2):
+                    if save_visitor_data(nickname, gender, age, location, declaration_text, q1, q2):
                         st.session_state['submitted'] = True
                         st.session_state['user_name'] = nickname
                         st.rerun()
 
 # フッター
 st.markdown("""
-<div style="text-align:center; margin-top:50px; font-size:10px; color:#999;">
+<div style="text-align:center; margin-top:30px; font-size:10px; color:#999; padding-bottom:20px;">
     © 2026 おかやまデコ活フェス
 </div>
 """, unsafe_allow_html=True)
