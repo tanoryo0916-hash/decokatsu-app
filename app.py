@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定（おしゃれ＆軽量化＆ヒーロー豪華版） ---
+# --- CSS設定（スマホ最適化＆おしゃれ版） ---
 st.markdown("""
 <style>
     /* 全体のフォント設定 */
@@ -36,8 +36,8 @@ st.markdown("""
     /* --- 🍑 ボタンのデザイン --- */
     .stButton>button {
         width: 100%;
-        height: 70px;
-        font-size: 22px !important;
+        height: 70px; /* スマホでも押しやすい高さ */
+        font-size: 20px !important;
         border-radius: 35px;
         font-weight: 900;
         border: none;
@@ -126,7 +126,7 @@ st.markdown("""
         padding-bottom: 5px;
     }
 
-    /* --- 👑 ログイン画面：認定ヒーロー数（豪華版） --- */
+    /* --- 👑 ログイン画面：認定ヒーロー数 --- */
     @keyframes shine {
         0% { background-position: -100px; }
         40%, 100% { background-position: 300px; }
@@ -247,7 +247,7 @@ st.markdown("""
         font-weight: 900;
     }
 
-    /* --- 🎉 イベント告知ボックス（フェス誘導） --- */
+    /* --- 🎉 イベント告知ボックス --- */
     .event-promo-box {
         background: linear-gradient(135deg, #F8BBD0 0%, #F48FB1 100%);
         border: 4px solid #EC407A;
@@ -307,7 +307,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* --- 🍑 タイトルデザイン --- */
+    /* --- 🍑 タイトルデザイン（PC標準） --- */
     .main-title {
         text-align: center;
         font-size: 32px;
@@ -376,6 +376,7 @@ st.markdown("""
     div[data-baseweb="tab-list"] {
         gap: 8px;
         margin-bottom: 10px;
+        flex-wrap: wrap; /* スマホでタブを折り返す */
     }
     button[data-baseweb="tab"] {
         background-color: #FFF3E0;
@@ -386,6 +387,7 @@ st.markdown("""
         padding: 12px 10px;
         font-size: 14px;
         transition: all 0.2s;
+        flex-grow: 1; /* スマホで幅いっぱいに */
     }
     button[data-baseweb="tab"]:hover {
         background-color: #FFE0B2;
@@ -396,6 +398,38 @@ st.markdown("""
         color: white !important;
         border: none;
         box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    }
+
+    /* =========================================
+       📱 スマホ用レスポンシブ対応 (画面幅600px以下)
+       ========================================= */
+    @media only screen and (max-width: 600px) {
+        /* タイトルを小さく */
+        .main-title { font-size: 24px !important; }
+        .hero-name { font-size: 24px !important; }
+        
+        /* 統計数字を小さく */
+        .stat-num { font-size: 24px !important; }
+        .special-hero-num { font-size: 40px !important; }
+        
+        /* カードの余白を詰める */
+        div[data-testid="stForm"] { padding: 15px !important; }
+        .hero-card, .mission-box, .decokatsu-intro { padding: 15px !important; }
+        
+        /* カスタムヘッダー調整 */
+        .custom-header { height: 180px !important; }
+        .header-title-main { font-size: 28px !important; }
+        .header-title-sub { font-size: 12px !important; padding: 5px 10px !important; }
+        
+        /* ボタン文字サイズ調整 */
+        .stButton>button { font-size: 18px !important; height: 60px !important; }
+        
+        /* 学校名などの補助テキスト */
+        .school-suffix { font-size: 14px; padding-top: 40px; }
+        
+        /* フェス告知 */
+        .event-title { font-size: 20px !important; }
+        .event-date { font-size: 14px !important; }
     }
 </style>
 """, unsafe_allow_html=True)
