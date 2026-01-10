@@ -25,9 +25,9 @@ st.markdown("""
         background-color: #FFF3E0; /* 背景：薄いオレンジ */
     }
 
-    /* ストリームリットの標準余白調整（上部の見切れを修正） */
+    /* ストリームリットの標準余白調整（ヘッダー見切れ修正） */
     .block-container {
-        padding-top: 1rem !important; /* ここを0から1remに変更 */
+        padding-top: 1rem !important; /* ここを0から1remに変更して余白確保 */
         padding-bottom: 3rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -38,9 +38,9 @@ st.markdown("""
     .header-area {
         background: linear-gradient(135deg, #FF6F00 0%, #FFCA28 100%);
         padding: 30px 20px 40px 20px;
-        border-radius: 20px; /* 丸みを少し調整 */
+        border-radius: 20px;
         text-align: center;
-        margin-bottom: 25px; /* 下の余白を調整 */
+        margin-bottom: 25px;
         box-shadow: 0 4px 20px rgba(0,0,0,0.15);
         color: white;
         position: relative;
