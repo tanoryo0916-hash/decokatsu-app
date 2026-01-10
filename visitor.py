@@ -69,7 +69,7 @@ st.markdown("""
         position: relative;
     }
     
-    /* ミッションバッジ（赤いリボン風） */
+    /* ミッションバッジ */
     .mission-badge {
         background: linear-gradient(90deg, #D32F2F, #FF5252);
         color: white;
@@ -98,7 +98,9 @@ st.markdown("""
     }
 
     /* 入力フィールド調整 */
-    div[data-baseweb="input"], div[data-baseweb="textarea"] { font-size: 16px !important; background-color: #FAFAFA; }
+    div[data-baseweb="input"], div[data-baseweb="textarea"], div[data-baseweb="select"] { 
+        font-size: 16px !important; background-color: #FAFAFA; 
+    }
     
     /* ラジオボタン調整 */
     div[role="radiogroup"] label {
@@ -107,9 +109,14 @@ st.markdown("""
     }
     div[role="radiogroup"] label:hover { background-color: #FFF8E1; border-color: #FFCC80; }
 
+    /* マルチセレクト（ブース選択）の調整 */
+    span[data-baseweb="tag"] {
+        background-color: #FFE0B2; font-weight: bold; color: #E65100;
+    }
+
     /* --- コンプリートボタン --- */
     .stButton>button {
-        width: 100%; height: 70px; font-size: 20px !important; border-radius: 35px;
+        width: 100%; height: 75px; font-size: 20px !important; border-radius: 35px;
         font-weight: 900; background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
         color: white; border: none; box-shadow: 0 6px 0px #1B5E20; /* 立体ボタン */
         margin-top: 10px; position: relative; top: 0; transition: all 0.1s;
@@ -145,6 +152,22 @@ st.markdown("""
 # ==========================================
 SCOPE = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
+# ★ここに実際のブース名を記入してください★
+BOOTH_LIST = [
+    "次世代EV車展示",
+    "ソーラーカー工作体験",
+    "古着リメイクワークショップ",
+    "地元野菜マルシェ",
+    "省エネ家電クイズ大会",
+    "廃油キャンドル作り",
+    "海洋プラスチックゴミ展示",
+    "水素エネルギー体験",
+    "フードドライブ受付",
+    "企業ブースA",
+    "企業ブースB",
+    "その他"
+]
+
 @st.cache_resource
 def get_connection():
     try:
@@ -158,7 +181,7 @@ def get_connection():
         st.error(f"接続エラー: {e}")
         return None
 
-def save_visitor_data(nickname, gender, age, location, action_text, impression_text):
+def save_visitor_data(nickname, gender, age, location, action_text, visited_booths_str, q1_score, q2_text):
     client = get_connection()
     if not client: return False
 
@@ -167,11 +190,12 @@ def save_visitor_data(nickname, gender, age, location, action_text, impression_t
         now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         user_id = f"VIS_{datetime.datetime.now().strftime('%H%M%S')}_{str(uuid.uuid4())[:4]}"
         
-        # メモ欄に情報を集約
+        # メモ欄に属性と宣言を集約
         memo_content = f"【属性】{age}/{gender}/{location}\n【宣言】{action_text}"
         
-        # Q1列には「ミッションクリア」と記録、Q2列に感想を記録
-        sheet.append_row([now, user_id, nickname, "一般来場", "ミッションコンプリート", 0, memo_content, "ブース4箇所達成", impression_text, ""])
+        # 保存 (ブース一覧は最後の列へ)
+        # 列順: [日時, ID, 名前, 対象日付, 項目, ポイント, メモ, Q1(満足度), Q2(感想), Q3(回ったブース)]
+        sheet.append_row([now, user_id, nickname, "一般来場", "ミッションコンプリート", 0, memo_content, q1_score, q2_text, visited_booths_str])
         return True
     except Exception as e:
         st.error(f"送信エラー: {e}")
@@ -181,7 +205,6 @@ def save_visitor_data(nickname, gender, age, location, action_text, impression_t
 #  3. 画面構成
 # ==========================================
 
-# セッション状態
 if 'submitted' not in st.session_state: st.session_state['submitted'] = False
 if 'user_name' not in st.session_state: st.session_state['user_name'] = ""
 
@@ -192,7 +215,7 @@ if not st.session_state['submitted']:
         <div class="event-title-main">おかやま<br>デコ活フェス2026</div>
         <div class="event-title-sub">会場限定ミッション</div>
         <div style="font-size:14px; font-weight:bold; color:rgba(255,255,255,0.9); line-height:1.5;">
-            3つのミッションをクリアして<br>
+            4つのミッションをクリアして<br>
             <strong>🎁 ガラポン抽選券</strong> を手に入れよう！
         </div>
     </div>
@@ -213,7 +236,7 @@ if st.session_state['submitted']:
         <div style="font-size:22px; font-weight:900; color:#E65100; border-bottom:3px solid #E65100; display:inline-block; margin-bottom:15px;">
             🎟 ガラポン参加チケット
         </div>
-        <div style="font-size:14px; font-weight:bold;">おめでとうございます！</div>
+        <div style="font-size:14px; font-weight:bold;">完全制覇おめでとう！</div>
         <div class="ticket-name">{st.session_state['user_name']} 様</div>
         <div style="background-color:white; padding:15px; border-radius:10px; display:inline-block; font-weight:bold; font-size:15px; margin-top:10px; color:#333; box-shadow:0 2px 5px rgba(0,0,0,0.1);">
             この画面をスタッフに見せて<br>ガラポンを回してね！
@@ -238,7 +261,6 @@ else:
         <div class="mission-card">
             <div class="mission-badge">MISSION 1</div>
             <div class="mission-title">📝 ヒーロー登録をせよ！</div>
-            <p style="font-size:13px; margin-bottom:10px;">まずはあなたの情報を教えてね。</p>
         """, unsafe_allow_html=True)
         st.markdown("**お名前（ニックネーム）**")
         nickname = st.text_input("名前", placeholder="例：ももたろう", label_visibility="collapsed")
@@ -249,7 +271,6 @@ else:
         st.markdown("**性別**")
         gender = st.radio("性別", ["男性", "女性", "その他・無回答"], horizontal=True, label_visibility="collapsed")
         st.markdown('</div>', unsafe_allow_html=True)
-
         st.markdown('<div class="next-arrow">▼</div>', unsafe_allow_html=True)
 
         # MISSION 2
@@ -263,29 +284,46 @@ else:
         """, unsafe_allow_html=True)
         declaration_text = st.text_area("宣言内容", placeholder="（例）パネルにあった「食品ロス削減」を見て、今日からご飯を残さず食べようと思いました！", height=100, label_visibility="collapsed")
         st.markdown('</div>', unsafe_allow_html=True)
-
         st.markdown('<div class="next-arrow">▼</div>', unsafe_allow_html=True)
 
-        # MISSION 3 (ブース回遊)
+        # MISSION 3 (ブース選択)
         st.markdown("""
         <div class="mission-card">
             <div class="mission-badge">MISSION 3</div>
             <div class="mission-title">👣 ブースを4つ回れ！</div>
             <p style="font-size:13px; color:#555; line-height:1.5;">
-                会場内のブースを<strong>4つ以上</strong>回って、体験したり話を聞いたりしよう！
+                回ったブースをリストから選んでね。<br>
+                <strong>4つ以上選ぶとクリア</strong>になるよ！
             </p>
         """, unsafe_allow_html=True)
         
-        # チェックボックス
-        is_visited = st.checkbox("✅ 4つ以上のブースを回りました！")
+        selected_booths = st.multiselect(
+            "回ったブースを選んでね（タップ）",
+            BOOTH_LIST,
+            placeholder="ここをタップして選択..."
+        )
         
-        if is_visited:
-            st.success("ナイス・アクション！👍")
-            st.markdown("**特に面白かったブースや感想を教えて！**")
-            impression = st.text_input("感想", placeholder="〇〇のブースが楽しかった！", label_visibility="collapsed")
-        else:
-            impression = ""
-            st.info("👆 回り終わったらチェックを入れてね！")
+        booth_count = len(selected_booths)
+        if booth_count >= 4:
+            st.markdown(f"✅ **{booth_count}個** 回った！ <span style='color:green; font-weight:bold;'>条件クリア！</span>", unsafe_allow_html=True)
+        elif booth_count > 0:
+            st.markdown(f"あと **{4 - booth_count}個** でクリアだよ！", unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="next-arrow">▼</div>', unsafe_allow_html=True)
+
+        # MISSION 4 (アンケート)
+        st.markdown("""
+        <div class="mission-card">
+            <div class="mission-badge">MISSION 4</div>
+            <div class="mission-title">💌 最後にアンケート！</div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<p style='font-weight:bold; font-size:14px; margin-bottom:5px;'>Q1. フェスは楽しかったですか？</p>", unsafe_allow_html=True)
+        q1 = st.radio("Q1", ["5：とても楽しかった！", "4：楽しかった", "3：ふつう", "2：あまり...", "1：よくなかった"], label_visibility="collapsed")
+        
+        st.markdown("<p style='font-weight:bold; font-size:14px; margin-top:10px; margin-bottom:5px;'>Q2. ご感想・気づいたこと</p>", unsafe_allow_html=True)
+        q2 = st.text_area("Q2", height=80, placeholder="自由記述", label_visibility="collapsed")
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -293,14 +331,15 @@ else:
         submitted = st.form_submit_button("ミッションコンプリート！\n（抽選券ゲット）")
 
         if submitted:
-            if not nickname: st.warning("MISSION 1：お名前を入れてね！")
-            elif not age: st.warning("MISSION 1：年代を選んでね！")
-            elif not location: st.warning("MISSION 1：お住まいを選んでね！")
+            if not nickname: st.warning("MISSION 1：お名前を入力してね！")
+            elif not age: st.warning("MISSION 1：年代を選択してね！")
+            elif not location: st.warning("MISSION 1：お住まいを選択してね！")
             elif not declaration_text: st.warning("MISSION 2：宣言を書いてね！")
-            elif not is_visited: st.warning("MISSION 3：ブースを回ってチェックを入れてね！")
+            elif len(selected_booths) < 4: st.error(f"MISSION 3：ブースがあと{4-len(selected_booths)}個足りないよ！")
             else:
                 with st.spinner("データ送信中..."):
-                    if save_visitor_data(nickname, gender, age, location, declaration_text, impression):
+                    booth_str = ", ".join(selected_booths)
+                    if save_visitor_data(nickname, gender, age, location, declaration_text, booth_str, q1, q2):
                         st.session_state['submitted'] = True
                         st.session_state['user_name'] = nickname
                         st.rerun()
