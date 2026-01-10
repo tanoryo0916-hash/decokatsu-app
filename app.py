@@ -24,7 +24,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS設定（スマホ最適化強化版） ---
+# --- CSS設定（スマホ最適化＆ヘッダー修正版） ---
 st.markdown("""
 <style>
     /* 全体のフォント設定 */
@@ -33,11 +33,20 @@ st.markdown("""
         color: #333;
     }
 
+    /* --- 📱 Streamlit標準の余白調整（ヘッダー見切れ防止） --- */
+    .block-container {
+        padding-top: 1rem !important; /* ここで上部の余白を確保 */
+        padding-bottom: 3rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+        max_width: 100% !important;
+    }
+
     /* --- 🍑 ボタンのデザイン --- */
     .stButton>button {
         width: 100%;
         height: 70px;
-        font-size: 22px !important;
+        font-size: 20px !important;
         border-radius: 35px;
         font-weight: 900;
         border: none;
@@ -307,7 +316,7 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* --- 🍑 タイトルデザイン --- */
+    /* --- 🍑 タイトルデザイン（PC標準） --- */
     .main-title {
         text-align: center;
         font-size: 32px;
@@ -418,7 +427,7 @@ st.markdown("""
         .event-title { font-size: 20px !important; }
         .event-date { font-size: 14px !important; }
         
-        /* 表の文字サイズを小さくする */
+        /* 表の文字サイズ調整 */
         div[data-testid="stDataEditor"] { font-size: 12px !important; }
         th, td { padding: 5px !important; }
     }
