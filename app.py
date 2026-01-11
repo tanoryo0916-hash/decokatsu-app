@@ -76,13 +76,13 @@ st.markdown("""
     }
 
     /* 入力フィールドのデザイン */
-    div[data-baseweb="input"], div[data-baseweb="select"] {
+    div[data-baseweb="input"], div[data-baseweb="select"], div[data-baseweb="textarea"] {
         border-radius: 12px;
         background-color: #FAFAFA;
         border: 2px solid #EEEEEE;
         transition: border-color 0.3s;
     }
-    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within {
+    div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within, div[data-baseweb="textarea"]:focus-within {
         border-color: #FF9800;
         background-color: #fff;
     }
@@ -564,7 +564,7 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         st.error(f"保存失敗: {e}")
         return False
 
-# ★ イベント誘導（チラシ表示）関数（日程変更対応）
+# ★ イベント誘導（チラシ表示）関数（日程・会場変更反映）
 def show_event_promo():
     st.markdown("""
     <div class="event-promo-box">
@@ -1068,6 +1068,50 @@ def main_screen():
                             st.success(f"回答ありがとう！ {special_points}g ゲット！\nあなたは「10,000人チャレンジ」のひとりとして認定されました！")
                             time.sleep(3)
                             st.rerun()
+
+    # ==========================================
+    #  ✨ 6/6 おまけミッション（デコ活宣言）
+    # ==========================================
+    is_6_6_done = False
+    if "6/6 (土)" in user.get('history_dict', {}):
+        is_6_6_done = True
+
+    if is_6_6_done:
+        with st.expander("✨ 6/6 (土) 未来へのデコ活宣言（完了！）", expanded=False):
+            st.success("素敵な宣言をありがとう！これからもその調子でがんばろう！")
+    else:
+        with st.expander("✨ 6/6 (土) おまけミッション：未来へのデコ活宣言", expanded=False):
+            st.markdown("""
+            **5日間のチャレンジ、おつかれさまでした！**<br>
+            このチャレンジが終わっても、地球を守る活動はつづきます。<br>
+            あなたが**「これからも 続けたいこと」**や**「新しく 始めたいこと」**を書いて教えてね！
+            """, unsafe_allow_html=True)
+            
+            with st.form("declaration_form"):
+                declaration_text = st.text_area("私のデコ活宣言", placeholder="例：これからは、毎日ごはんを残さず食べます！\n例：使わない電気は必ず消すのを続けます！", height=100)
+                
+                submit_declaration = st.form_submit_button("宣言を送って ポイントゲット！")
+                
+                if submit_declaration:
+                    if not declaration_text:
+                        st.warning("宣言を書いてね！")
+                    else:
+                        with st.spinner("送信中..."):
+                            bonus_points = 50 # 宣言ボーナス
+                            actions = ["デコ活宣言"]
+                            
+                            if save_daily_challenge(
+                                user['id'], user['name'], "6/6 (土)", actions, bonus_points, declaration_text
+                            ):
+                                st.session_state.user_info['total_co2'] += bonus_points
+                                if 'history_dict' not in st.session_state.user_info:
+                                    st.session_state.user_info['history_dict'] = {}
+                                st.session_state.user_info['history_dict']["6/6 (土)"] = actions
+                                
+                                st.balloons()
+                                st.success(f"宣言ありがとう！ {bonus_points}g ゲット！\nこれからもエコヒーローとして活躍してね！")
+                                time.sleep(3)
+                                st.rerun()
 
     st.markdown("---")
     
