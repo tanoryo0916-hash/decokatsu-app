@@ -35,7 +35,7 @@ st.markdown("""
 
     /* --- 📱 Streamlit標準の余白調整（ヘッダー見切れ防止・強化版） --- */
     .block-container {
-        padding-top: 3.5rem !important; /* ★ここを3.5remに増やして余白を確保 */
+        padding-top: 3.5rem !important;
         padding-bottom: 3rem !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
@@ -279,11 +279,12 @@ st.markdown("""
         background-color: white;
         color: #EC407A;
         font-weight: bold;
-        padding: 5px 15px;
+        padding: 8px 15px;
         border-radius: 20px;
         display: inline-block;
         margin-bottom: 15px;
         font-size: 18px;
+        line-height: 1.5;
     }
 
     /* --- ℹ️ ミッション説明ボックス --- */
@@ -563,12 +564,12 @@ def save_daily_challenge(user_id, nickname, target_date, actions_done, total_poi
         st.error(f"保存失敗: {e}")
         return False
 
-# ★ イベント誘導（チラシ表示）関数
+# ★ イベント誘導（チラシ表示）関数（日程変更対応）
 def show_event_promo():
     st.markdown("""
     <div class="event-promo-box">
         <div class="event-title">🎉 おかやまデコ活フェス2026 🎉</div>
-        <div class="event-date">6月6日(土)・7日(日) 開催！イオンモールにて</div>
+        <div class="event-date">6月7日(日) 10:00〜19:00<br>イオンモール倉敷 ノースコートにて</div>
         <p><strong>特別（とくべつ）ミッションを クリアしたら、<br>会場（かいじょう）へ あそびにきてね！</strong></p>
         <p style="font-size:14px; background-color:white; padding:10px; border-radius:10px; display:inline-block;">
         受付（うけつけ）で<strong>「学校名」と「名前」</strong>を言うだけで<br>ガラポン抽選（ちゅうせん）に参加できるよ！
