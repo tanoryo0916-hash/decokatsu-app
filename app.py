@@ -622,13 +622,11 @@ import base64
 import datetime
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（音声診断機能付き） ---
+# --- 🎮 激闘！分別マスター（最終完成版） ---
 def show_sorting_game():
     
-    # 📁 設定
+    # 📁 設定：ファイル名（大文字小文字に注意）
     DATA_FILE = "ranking_log.json"
-    
-    # ここでファイル名を定義（大文字小文字が合っているか確認してください）
     FILES = {
         "bgm": "bgm.mp3",
         "correct": "correct.mp3",
@@ -636,32 +634,24 @@ def show_sorting_game():
         "clear": "clear.mp3"
     }
 
-    # --- 🛠️ 音声再生関数（強化版） ---
+    # --- 🛠️ 音声再生関数 ---
     def get_audio_html(filename, loop=False, volume=0.5):
-        # ファイルの絶対パスを取得（確実に見つけるため）
         file_path = os.path.abspath(filename)
         
-        # 1. ファイル存在チェック
         if not os.path.exists(file_path):
-            # デバッグ用にエラーを表示（開発中のみ）
-            # st.error(f"⚠️ {filename} が見つかりません！")
             return ""
 
-        # 2. Base64エンコード（ブラウザに直接データを渡す）
         try:
             with open(file_path, "rb") as f:
                 data = f.read()
             b64 = base64.b64encode(data).decode()
-            mime_type = "audio/mpeg" # MP3の正しいMIMEタイプ
-        except Exception as e:
-            st.error(f"読み込みエラー: {e}")
+            mime_type = "audio/mpeg"
+        except Exception:
             return ""
 
-        # 3. HTML生成（ブラウザの自動再生ポリシー対策）
         rnd_id = random.randint(0, 1000000)
         loop_attr = "loop" if loop else ""
         
-        # display:noneだと一部ブラウザで無視されることがあるため、サイズ0で配置
         return f"""
             <div style="width:0; height:0; overflow:hidden;">
                 <audio id="audio_{rnd_id}" {loop_attr} autoplay>
@@ -672,38 +662,13 @@ def show_sorting_game():
                     audio.volume = {volume};
                     var playPromise = audio.play();
                     if (playPromise !== undefined) {{
-                        playPromise.then(_ => {{
-                            // 再生成功
-                        }})
-                        .catch(error => {{
-                            console.log("自動再生がブロックされました: " + error);
+                        playPromise.catch(error => {{
+                            console.log("Auto-play blocked");
                         }});
                     }}
                 </script>
             </div>
         """
-
-    # --- 🔍 デバッグ用：サイドバーでファイル確認 ---
-    with st.sidebar:
-        st.header("🔊 音響チェック")
-        st.write("現在のフォルダにあるファイル:")
-        # フォルダ内の全ファイルを表示（確認用）
-        try:
-            files = os.listdir(".")
-            mp3_files = [f for f in files if f.endswith(".mp3")]
-            if mp3_files:
-                st.success(f"発見: {', '.join(mp3_files)}")
-            else:
-                st.error("MP3ファイルが1つもありません！")
-        except:
-            st.error("フォルダを読み込めません")
-
-        st.write("---")
-        st.write("手動テスト（音が鳴るか確認）:")
-        if st.button("🎵 BGM再生テスト"):
-            st.markdown(get_audio_html(FILES["bgm"]), unsafe_allow_html=True)
-        if st.button("⭕ 正解音テスト"):
-            st.markdown(get_audio_html(FILES["correct"]), unsafe_allow_html=True)
 
     # --- 🛠️ データ保存・読込 ---
     def load_logs():
@@ -881,8 +846,8 @@ def show_sorting_game():
 
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
-        # BGM再生
-        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.2), unsafe_allow_html=True)
+        # ★BGM音量変更：volume=0.1 にしました★
+        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.1), unsafe_allow_html=True)
 
         q_idx = st.session_state.q_index
         total_q = len(st.session_state.current_questions)
