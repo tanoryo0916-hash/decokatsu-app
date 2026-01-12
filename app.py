@@ -614,6 +614,195 @@ if 'user_info' not in st.session_state:
 #  5. 画面コンポーネント
 # ==========================================
 
+import time
+import random
+import streamlit as st
+
+# --- 🎮 激闘！分別マスター（30種類対応版） ---
+def show_sorting_game():
+    st.markdown("""
+    <div style="background-color:#FFF3E0; padding:15px; border-radius:15px; border:3px solid #FF9800; text-align:center; margin-bottom:20px;">
+        <div style="font-size:22px; font-weight:bold; color:#E65100; margin-bottom:5px;">
+            ⏱️ 激闘！分別マスター
+        </div>
+        <div style="font-size:14px;">
+            ゴミを <strong>10個</strong> 分別しおわるまでの <strong>タイム</strong> をきそうぞ！<br>
+            ランキング 1位を めざせ！
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # --- 1. データ定義（全30種類に増量） ---
+    # カテゴリID: 0=燃える, 1=資源, 2=埋立
+    garbage_data = [
+        # 🔥 燃えるゴミ (10種)
+        {"name": "🍌 バナナの皮", "type": 0},
+        {"name": "🤧 使ったティッシュ", "type": 0},
+        {"name": "🥢 汚れた割り箸", "type": 0},
+        {"name": "🧸 古いぬいぐるみ", "type": 0},
+        {"name": "🍂 落ち葉", "type": 0},
+        {"name": "👕 汚れたTシャツ", "type": 0},
+        {"name": "🧾 レシート", "type": 0},
+        {"name": "🐟 魚の骨", "type": 0},
+        {"name": "😷 使い捨てマスク", "type": 0},
+        {"name": "🥚 卵の殻", "type": 0},
+        
+        # ♻️ 資源ゴミ (10種)
+        {"name": "🥤 ペットボトル", "type": 1},
+        {"name": "🥫 空き缶（アルミ・スチール）", "type": 1},
+        {"name": "🍾 空き瓶", "type": 1},
+        {"name": "📰 新聞紙", "type": 1},
+        {"name": "📦 ダンボール", "type": 1},
+        {"name": "🥛 牛乳パック（洗ったもの）", "type": 1},
+        {"name": "📚 読み終わった雑誌", "type": 1},
+        {"name": "📃 チラシ", "type": 1},
+        {"name": "🍫 お菓子の空き箱", "type": 1},
+        {"name": "📓 使い終わったノート", "type": 1},
+
+        # 🧱 埋立ゴミ (10種)
+        {"name": "🍵 割れたお茶碗（陶器）", "type": 2},
+        {"name": "🥛 割れたコップ（ガラス）", "type": 2},
+        {"name": "🧤 ゴム手袋", "type": 2},
+        {"name": "☂️ 壊れた傘", "type": 2},
+        {"name": "🧊 保冷剤", "type": 2},
+        {"name": "📼 ビデオテープ", "type": 2},
+        {"name": "💡 電球", "type": 2},
+        {"name": "💿 CD・DVD", "type": 2},
+        {"name": "🪞 割れた鏡", "type": 2},
+        {"name": "🔋 乾電池", "type": 2},
+    ]
+    
+    # カテゴリ名と色
+    categories = {
+        0: {"name": "🔥 燃える", "color": "danger"},  # 赤
+        1: {"name": "♻️ 資 源", "color": "primary"},   # 青
+        2: {"name": "🧱 埋 立", "color": "secondary"} # グレー
+    }
+
+    # --- 2. ゲーム状態の初期化 ---
+    if 'game_state' not in st.session_state:
+        st.session_state.game_state = 'READY'
+    if 'current_questions' not in st.session_state:
+        st.session_state.current_questions = []
+    if 'q_index' not in st.session_state:
+        st.session_state.q_index = 0
+    if 'start_time' not in st.session_state:
+        st.session_state.start_time = 0.0
+    if 'final_time' not in st.session_state:
+        st.session_state.final_time = 0.0
+    
+    # ランキングデータ
+    if 'ranking_data' not in st.session_state:
+        st.session_state.ranking_data = [
+            {"name": "エコ博士", "time": 8.5},
+            {"name": "リサイクルマン", "time": 10.2},
+            {"name": "ももたろう", "time": 15.0},
+        ]
+
+    # --- 3. ゲーム進行ロジック ---
+    
+    # ■ スタート画面
+    if st.session_state.game_state == 'READY':
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            st.info("👇 **スタート** ボタンを押して挑戦しよう！")
+        with col2:
+            if st.button("🏁 スタート！", use_container_width=True, type="primary"):
+                st.session_state.current_questions = random.sample(garbage_data, 10)
+                st.session_state.q_index = 0
+                st.session_state.start_time = time.time()
+                st.session_state.game_state = 'PLAYING'
+                st.rerun()
+            
+        # ランキング表示
+        with st.expander("🏆 ランキングを見る", expanded=False):
+            sorted_rank = sorted(st.session_state.ranking_data, key=lambda x: x['time'])
+            for i, r in enumerate(sorted_rank[:5]):
+                st.markdown(f"{i+1}位： **{r['time']}秒** （{r['name']}）")
+
+    # ■ プレイ画面
+    elif st.session_state.game_state == 'PLAYING':
+        q_idx = st.session_state.q_index
+        total_q = len(st.session_state.current_questions)
+        
+        # 終了判定
+        if q_idx >= total_q:
+            end_time = time.time()
+            st.session_state.final_time = round(end_time - st.session_state.start_time, 2)
+            st.session_state.game_state = 'FINISHED'
+            st.rerun()
+        
+        target_item = st.session_state.current_questions[q_idx]
+
+        # プログレスバー
+        st.progress((q_idx / total_q), text=f"第 {q_idx + 1} 問 / 全 {total_q} 問")
+        
+        # 問題表示
+        st.markdown(f"""
+        <div style="text-align:center; padding:20px; font-size:36px; font-weight:bold; background-color:#F5F5F5; border-radius:10px; margin:10px 0; border:2px solid #ddd;">
+            {target_item['name']}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.caption("このゴミはどれ？ 👇")
+
+        # 3択ボタン配置
+        c1, c2, c3 = st.columns(3)
+        
+        def check_answer(user_choice):
+            correct_type = st.session_state.current_questions[st.session_state.q_index]['type']
+            if user_choice == correct_type:
+                st.session_state.q_index += 1
+                if st.session_state.q_index < 10:
+                    st.toast("⭕️ せいかい！", icon="⭕")
+            else:
+                st.toast("❌ ちがうよ！", icon="❌")
+
+        with c1:
+            if st.button(categories[0]['name'], key="ans_0", type=categories[0]['color'], use_container_width=True):
+                check_answer(0)
+                st.rerun()
+        with c2:
+            if st.button(categories[1]['name'], key="ans_1", type=categories[1]['color'], use_container_width=True):
+                check_answer(1)
+                st.rerun()
+        with c3:
+            if st.button(categories[2]['name'], key="ans_2", type=categories[2]['color'], use_container_width=True):
+                check_answer(2)
+                st.rerun()
+
+    # ■ 結果発表画面
+    elif st.session_state.game_state == 'FINISHED':
+        my_time = st.session_state.final_time
+        st.balloons()
+        
+        st.markdown(f"""
+        <div style="text-align:center; padding:10px;">
+            <h2 style="color:#E91E63;">🎉 クリア！</h2>
+            <div style="font-size:40px; font-weight:bold;">
+                Time: {my_time} 秒
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 称号判定
+        if my_time <= 10.0: title = "👑 神レベル！"
+        elif my_time <= 15.0: title = "🥇 分別マスター！"
+        else: title = "🥉 よくがんばった！"
+        st.info(f"称号： {title}")
+
+        with st.form("ranking_form"):
+            name = st.text_input("ニックネームを入力してね")
+            submitted = st.form_submit_button("ランキングに登録")
+            if submitted and name:
+                st.session_state.ranking_data.append({"name": name, "time": my_time})
+                st.session_state.game_state = 'READY'
+                st.rerun()
+        
+        if st.button("登録せずに戻る"):
+            st.session_state.game_state = 'READY'
+            st.rerun()
+
 def login_screen():
     # --- おしゃれなカスタムヘッダー ---
     header_bg_url = "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
