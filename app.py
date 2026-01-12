@@ -1085,6 +1085,8 @@ def main_screen():
     
     st.markdown("---")
 
+    show_sorting_game()
+
     st.markdown("### 📝 チャレンジ・チェック表")
     st.info("やったことにチェックを入れて、「ほぞん する」ボタンを押してね！")
     
