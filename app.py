@@ -618,12 +618,11 @@ import time
 import random
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（判定・音修正版） ---
+# --- 🎮 激闘！分別マスター（ランキング強化版） ---
 def show_sorting_game():
     
     # --- 🔊 音声再生用コンポーネント ---
     def play_sound_html(sound_url):
-        # 毎回異なるIDを付与してブラウザに「新しい再生」と認識させる
         rnd = random.randint(0, 100000)
         st.markdown(f"""
             <audio autoplay="true" style="display:none;">
@@ -637,7 +636,6 @@ def show_sorting_game():
             </script>
         """, unsafe_allow_html=True)
 
-    # 音源URLリスト（確実にアクセスできるWikimedia Commons）
     SOUNDS = {
         "bgm": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Nola_-_Kevin_MacLeod.ogg",
         "correct": "https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Positive_Feedback.ogg",
@@ -705,14 +703,17 @@ def show_sorting_game():
     # --- 2. ステート管理 ---
     if 'game_state' not in st.session_state:
         st.session_state.game_state = 'READY'
-    if 'ranking_data' not in st.session_state:
-        st.session_state.ranking_data = [{"name": "エコ博士", "time": 8.5}]
     
-    # 判定画面用のステート
+    # 【変更】初期データを空にする
+    if 'ranking_data' not in st.session_state:
+        st.session_state.ranking_data = [] 
+
+    if 'penalty_time' not in st.session_state:
+        st.session_state.penalty_time = 0
     if 'feedback_mode' not in st.session_state:
         st.session_state.feedback_mode = False
     if 'feedback_result' not in st.session_state:
-        st.session_state.feedback_result = None # 'correct' or 'wrong'
+        st.session_state.feedback_result = None
 
     # --- 3. ゲーム進行 ---
     
@@ -731,17 +732,30 @@ def show_sorting_game():
                 st.session_state.game_state = 'PLAYING'
                 st.rerun()
 
-        with st.expander("🏆 ランキング"):
-            sorted_rank = sorted(st.session_state.ranking_data, key=lambda x: x['time'])
-            for i, r in enumerate(sorted_rank[:5]):
-                st.markdown(f"{i+1}位： **{r['time']}秒** ({r['name']})")
+        # ランキング表示（10位まで・学校名込み）
+        with st.expander("🏆 ランキングを見る", expanded=True):
+            if not st.session_state.ranking_data:
+                st.write("まだランキングはありません。1位をねらおう！")
+            else:
+                sorted_rank = sorted(st.session_state.ranking_data, key=lambda x: x['time'])
+                # 【変更】10位まで表示
+                for i, r in enumerate(sorted_rank[:10]):
+                    # 学校名がない古いデータ対策で .get を使用
+                    school_name = r.get('school', '')
+                    display_school = f" / {school_name}" if school_name else ""
+                    
+                    st.markdown(f"""
+                    <div style='background-color:white; padding:5px; margin-bottom:5px; border-radius:5px; border-bottom:1px solid #ddd;'>
+                        <strong>{i+1}位</strong>： <span style='color:#E91E63; font-weight:bold;'>{r['time']}秒</span>
+                        <span style='color:#555;'>（{r['name']}{display_school}）</span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
         
-        # --- A. 判定表示モード（ここが最優先で表示されます） ---
+        # --- A. 判定表示モード ---
         if st.session_state.feedback_mode:
-            # 判定結果を表示
             if st.session_state.feedback_result == 'correct':
                 st.markdown("""
                 <div class="feedback-box" style="background-color:#E8F5E9; border:5px solid #4CAF50;">
@@ -760,20 +774,14 @@ def show_sorting_game():
                 """, unsafe_allow_html=True)
                 play_sound_html(SOUNDS['wrong'])
 
-            # 1秒待ってから次の問題へ
             time.sleep(1)
-            
-            # 時間補正（判定表示時間はタイムに含めない）
             st.session_state.start_time += 1.0
-            
-            # モードを戻して次へ
             st.session_state.feedback_mode = False
             st.session_state.q_index += 1
             st.rerun()
 
         # --- B. 問題出題モード ---
         else:
-            # BGMを流す（音量小）
             st.markdown(f"""
                 <audio autoplay loop id="bgm">
                     <source src="{SOUNDS['bgm']}" type="audio/ogg">
@@ -784,14 +792,12 @@ def show_sorting_game():
             q_idx = st.session_state.q_index
             total_q = len(st.session_state.current_questions)
 
-            # 終了チェック
             if q_idx >= total_q:
                 st.session_state.final_time = round(time.time() - st.session_state.start_time + st.session_state.penalty_time, 2)
                 st.session_state.game_state = 'FINISHED'
                 st.rerun()
 
             target_item = st.session_state.current_questions[q_idx]
-
             st.progress((q_idx / total_q), text=f"第 {q_idx + 1} 問 / 全 {total_q} 問")
 
             st.markdown(f"""
@@ -805,7 +811,6 @@ def show_sorting_game():
 
             c1, c2, c3 = st.columns(3)
 
-            # ボタンが押されたら「判定モード」をONにしてリロードする関数
             def answer(choice):
                 correct = st.session_state.current_questions[q_idx]['type']
                 if choice == correct:
@@ -847,17 +852,34 @@ def show_sorting_game():
         </div>
         """, unsafe_allow_html=True)
 
+        # 【変更】登録フォームに学校名を追加
         with st.form("rank_form"):
-            name = st.text_input("ニックネーム")
+            st.write("ランキングにとうろくしよう！")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                name = st.text_input("ニックネーム", placeholder="例：たろう")
+            with col_b:
+                school = st.text_input("学校名", placeholder="例：〇〇小")
+            
             submitted = st.form_submit_button("ランキングに登録", type="primary", use_container_width=True)
-            if submitted and name:
-                st.session_state.ranking_data.append({"name": name, "time": my_time})
-                st.session_state.game_state = 'READY'
-                st.rerun()
+            
+            if submitted:
+                if name and school:
+                    # 学校名も一緒に保存
+                    st.session_state.ranking_data.append({
+                        "name": name,
+                        "school": school,
+                        "time": my_time
+                    })
+                    st.session_state.game_state = 'READY'
+                    st.rerun()
+                else:
+                    st.error("ニックネームと学校名をいれてね！")
         
         if st.button("戻る"):
             st.session_state.game_state = 'READY'
             st.rerun()
+            
 def login_screen():
     # --- おしゃれなカスタムヘッダー ---
     header_bg_url = "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
