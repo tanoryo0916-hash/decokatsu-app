@@ -6,6 +6,7 @@ import time
 import os
 import base64
 import random
+import json
 
 # --- 真っ白画面回避のための安全策 ---
 try:
@@ -614,22 +615,13 @@ if 'user_info' not in st.session_state:
 #  5. 画面コンポーネント
 # ==========================================
 
-import time
-import random
-import json
-import os
-import base64
-import datetime
-import streamlit as st
-
-# --- 🎮 激闘！分別マスター（BGM停止・音量調整版） ---
+# --- 🎮 激闘！分別マスター（BGMなし・SEのみ版） ---
 def show_sorting_game():
     
     # 📁 設定
     DATA_FILE = "ranking_log.json"
-    # ファイル名定義
+    # ファイル名定義 (BGMは削除済み)
     FILES = {
-        "bgm": "bgm.mp3",
         "correct": "correct.mp3",
         "wrong": "wrong.mp3",
         "clear": "clear.mp3"
@@ -669,18 +661,6 @@ def show_sorting_game():
                     }}
                 </script>
             </div>
-        """
-
-    # --- 🛠️ BGM強制停止用スクリプト ---
-    def stop_bgm_script():
-        return """
-        <script>
-            var bgm = document.getElementById("game_bgm");
-            if (bgm) {
-                bgm.pause();
-                bgm.currentTime = 0;
-            }
-        </script>
         """
 
     # --- 🛠️ データ保存・読込 ---
@@ -857,11 +837,6 @@ def show_sorting_game():
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
         
-        # ★BGM設定★
-        # IDを "game_bgm" に固定して、後でJavaScriptから操作できるようにする
-        # 音量: 0.02 (0.05のさらに半分以下)
-        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.02, element_id="game_bgm"), unsafe_allow_html=True)
-
         q_idx = st.session_state.q_index
         total_q = len(st.session_state.current_questions)
         
@@ -923,9 +898,6 @@ def show_sorting_game():
 
     # ■ クリア画面
     elif st.session_state.game_state == 'FINISHED':
-        # ★BGM停止★ 
-        # JavaScriptを注入してID "game_bgm" のオーディオを強制的にPauseする
-        st.markdown(stop_bgm_script(), unsafe_allow_html=True)
         
         # ★クリア音設定★ volume=1.0 (最大値)
         st.markdown(get_audio_html(FILES["clear"], volume=1.0), unsafe_allow_html=True)
@@ -1228,7 +1200,7 @@ def main_screen():
     else:
         st.caption(f"まずは **{GOAL} g** を目指してがんばろう！")
 
-   
+    
     
     st.markdown("---")
 
@@ -1339,7 +1311,7 @@ def main_screen():
                         prev_points = 0
                         for a in prev_actions:
                              if a in action_master:
-                                 prev_points += action_master[a]["point"]
+                                prev_points += action_master[a]["point"]
                         
                         diff_points = day_points - prev_points
                         
