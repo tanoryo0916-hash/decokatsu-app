@@ -618,77 +618,77 @@ import time
 import random
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（修正完了版） ---
+# --- 🎮 激闘！分別マスター（判定・音修正版） ---
 def show_sorting_game():
     
-    # --- 🔊 音声再生ロジック（修正版） ---
-    def play_sound(sound_type):
-        # 確実に再生できるパブリックドメイン(CC0)の音源URLに変更しました
-        sounds = {
-            # 軽快なBGM（Wikimedia Commons）
-            "bgm": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Nola_-_Kevin_MacLeod.ogg",
-            # 正解音（高いピンポン音）
-            "correct": "https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Positive_Feedback.ogg",
-            # 不正解音（低いブザー音）
-            "wrong": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Vibraphon_the_end.ogg",
-            # クリア音（ファンファーレ）
-            "clear": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Music-14574.mp3"
-        }
-        
-        # 音量調整と自動再生のためのHTML埋め込み
-        if sound_type == "bgm":
-            # BGM: ループ再生、音量小さめ(0.2)
-            st.markdown(f"""
-                <audio autoplay loop id="bgm_player">
-                    <source src="{sounds['bgm']}" type="audio/ogg">
-                </audio>
-                <script>
-                    var audio = document.getElementById("bgm_player");
-                    audio.volume = 0.2;
-                </script>
-            """, unsafe_allow_html=True)
-        elif sound_type in sounds:
-            # SE: 単発再生、音量中くらい(0.5)
-            # 毎回IDを変えてブラウザに「新しい音」と認識させる
-            rnd_id = random.randint(0, 10000)
-            st.markdown(f"""
-                <audio autoplay id="se_player_{rnd_id}">
-                    <source src="{sounds[sound_type]}" type="audio/ogg">
-                </audio>
-                <script>
-                    var audio = document.getElementById("se_player_{rnd_id}");
-                    audio.volume = 0.5;
-                </script>
-            """, unsafe_allow_html=True)
+    # --- 🔊 音声再生用コンポーネント ---
+    def play_sound_html(sound_url):
+        # 毎回異なるIDを付与してブラウザに「新しい再生」と認識させる
+        rnd = random.randint(0, 100000)
+        st.markdown(f"""
+            <audio autoplay="true" style="display:none;">
+                <source src="{sound_url}" type="audio/ogg">
+                <source src="{sound_url}" type="audio/mp3">
+            </audio>
+            <script>
+                var audio_{rnd} = new Audio("{sound_url}");
+                audio_{rnd}.volume = 0.5;
+                audio_{rnd}.play();
+            </script>
+        """, unsafe_allow_html=True)
+
+    # 音源URLリスト（確実にアクセスできるWikimedia Commons）
+    SOUNDS = {
+        "bgm": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Nola_-_Kevin_MacLeod.ogg",
+        "correct": "https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Positive_Feedback.ogg",
+        "wrong": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Vibraphon_the_end.ogg",
+        "clear": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Music-14574.mp3"
+    }
 
     # --- デザインCSS ---
     st.markdown("""
-    <div style="background-color:#FFF3E0; padding:15px; border-radius:15px; border:3px solid #FF9800; text-align:center; margin-bottom:20px;">
+    <style>
+        .game-header {
+            background-color:#FFF3E0; padding:15px; border-radius:15px; 
+            border:3px solid #FF9800; text-align:center; margin-bottom:20px;
+        }
+        .question-box {
+            text-align:center; padding:30px; background-color:#FFFFFF; 
+            border-radius:15px; margin:20px 0; border:4px solid #607D8B;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .feedback-box {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            z-index: 9999; padding: 40px; border-radius: 20px; text-align: center;
+            width: 80%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+    </style>
+    <div class="game-header">
         <div style="font-size:22px; font-weight:bold; color:#E65100; margin-bottom:5px;">
             ⏱️ 激闘！分別マスター
         </div>
         <div style="font-size:14px; color:#333;">
-            ゴミを <strong>10個</strong> 分別しおわるまでの <strong>タイム</strong> をきそうぞ！<br>
-            <span style="color:red; font-weight:bold;">※ まちがえると ＋5秒 のペナルティ！</span>
+            全10問！ タイムアタック！<br>
+            <span style="color:red; font-weight:bold;">※ まちがえると ＋5秒 ペナルティ！</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- 1. データ定義（全30種類） ---
+    # --- 1. データ定義 ---
     garbage_data = [
-        # 🔥 燃えるゴミ (10種)
+        # 🔥 燃えるゴミ
         {"name": "🍌 バナナの皮", "type": 0}, {"name": "🤧 使ったティッシュ", "type": 0},
         {"name": "🥢 汚れた割り箸", "type": 0}, {"name": "🧸 古いぬいぐるみ", "type": 0},
         {"name": "🍂 落ち葉", "type": 0}, {"name": "👕 汚れたTシャツ", "type": 0},
         {"name": "🧾 レシート", "type": 0}, {"name": "🐟 魚の骨", "type": 0},
         {"name": "😷 使い捨てマスク", "type": 0}, {"name": "🥚 卵の殻", "type": 0},
-        # ♻️ 資源ゴミ (10種)
+        # ♻️ 資源ゴミ
         {"name": "🥤 ペットボトル", "type": 1}, {"name": "🥫 空き缶", "type": 1},
         {"name": "🍾 空き瓶", "type": 1}, {"name": "📰 新聞紙", "type": 1},
         {"name": "📦 ダンボール", "type": 1}, {"name": "🥛 牛乳パック(洗)", "type": 1},
         {"name": "📚 雑誌", "type": 1}, {"name": "📃 チラシ", "type": 1},
         {"name": "🍫 お菓子の箱", "type": 1}, {"name": "📓 ノート", "type": 1},
-        # 🧱 埋立ゴミ (10種)
+        # 🧱 埋立ゴミ
         {"name": "🍵 割れた茶碗", "type": 2}, {"name": "🥛 割れたコップ", "type": 2},
         {"name": "🧤 ゴム手袋", "type": 2}, {"name": "☂️ 壊れた傘", "type": 2},
         {"name": "🧊 保冷剤", "type": 2}, {"name": "📼 ビデオテープ", "type": 2},
@@ -702,110 +702,138 @@ def show_sorting_game():
         2: {"name": "🧱 埋 立", "color": "secondary"}
     }
 
-    # --- 2. ゲーム状態の初期化 ---
+    # --- 2. ステート管理 ---
     if 'game_state' not in st.session_state:
         st.session_state.game_state = 'READY'
-    if 'penalty_time' not in st.session_state:
-        st.session_state.penalty_time = 0
-    if 'se_to_play' not in st.session_state:
-        st.session_state.se_to_play = None
-    
     if 'ranking_data' not in st.session_state:
-        st.session_state.ranking_data = [
-            {"name": "エコ博士", "time": 8.5},
-            {"name": "リサイクルマン", "time": 10.2},
-            {"name": "ももたろう", "time": 15.0},
-        ]
+        st.session_state.ranking_data = [{"name": "エコ博士", "time": 8.5}]
+    
+    # 判定画面用のステート
+    if 'feedback_mode' not in st.session_state:
+        st.session_state.feedback_mode = False
+    if 'feedback_result' not in st.session_state:
+        st.session_state.feedback_result = None # 'correct' or 'wrong'
 
-    # SE再生処理
-    if st.session_state.se_to_play:
-        play_sound(st.session_state.se_to_play)
-        st.session_state.se_to_play = None
-
-    # --- 3. ゲーム進行ロジック ---
+    # --- 3. ゲーム進行 ---
     
     # ■ スタート画面
     if st.session_state.game_state == 'READY':
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.info("👇 **スタート** ボタンを押して挑戦しよう！")
+            st.info("👇 **スタート** を押してゲーム開始！ 音が出ます🔊")
         with col2:
             if st.button("🏁 スタート！", use_container_width=True, type="primary"):
                 st.session_state.current_questions = random.sample(garbage_data, 10)
                 st.session_state.q_index = 0
                 st.session_state.start_time = time.time()
                 st.session_state.penalty_time = 0
+                st.session_state.feedback_mode = False
                 st.session_state.game_state = 'PLAYING'
-                st.session_state.se_to_play = None 
                 st.rerun()
-            
-        with st.expander("🏆 ランキングを見る", expanded=False):
+
+        with st.expander("🏆 ランキング"):
             sorted_rank = sorted(st.session_state.ranking_data, key=lambda x: x['time'])
             for i, r in enumerate(sorted_rank[:5]):
-                st.markdown(f"{i+1}位： **{r['time']}秒** （{r['name']}）")
+                st.markdown(f"{i+1}位： **{r['time']}秒** ({r['name']})")
 
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
-        play_sound("bgm") # BGM再生
-
-        q_idx = st.session_state.q_index
-        total_q = len(st.session_state.current_questions)
         
-        if q_idx >= total_q:
-            end_time = time.time()
-            raw_time = end_time - st.session_state.start_time
-            st.session_state.final_time = round(raw_time + st.session_state.penalty_time, 2)
-            st.session_state.game_state = 'FINISHED'
-            st.session_state.se_to_play = "clear"
-            st.rerun()
-        
-        target_item = st.session_state.current_questions[q_idx]
-
-        st.progress((q_idx / total_q), text=f"第 {q_idx + 1} 問 / 全 {total_q} 問")
-        
-        # 視認性向上のためのスタイル
-        st.markdown(f"""
-        <div style="text-align:center; padding:30px; background-color:#FFFFFF; border-radius:15px; margin:20px 0; border:4px solid #607D8B; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <div style="font-size:36px; font-weight:bold; color:#333333;">
-                {target_item['name']}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.caption("このゴミはどれ？ 👇")
-
-        c1, c2, c3 = st.columns(3)
-        
-        def check_answer(user_choice):
-            correct_type = st.session_state.current_questions[st.session_state.q_index]['type']
-            if user_choice == correct_type:
-                st.toast("⭕️ せいかい！", icon="⭕")
-                st.session_state.se_to_play = "correct"
+        # --- A. 判定表示モード（ここが最優先で表示されます） ---
+        if st.session_state.feedback_mode:
+            # 判定結果を表示
+            if st.session_state.feedback_result == 'correct':
+                st.markdown("""
+                <div class="feedback-box" style="background-color:#E8F5E9; border:5px solid #4CAF50;">
+                    <h1 style="color:#2E7D32; font-size:100px; margin:0;">⭕️</h1>
+                    <h2 style="color:#2E7D32;">せいかい！</h2>
+                </div>
+                """, unsafe_allow_html=True)
+                play_sound_html(SOUNDS['correct'])
             else:
-                st.toast("❌ ちがうよ！ ＋5秒", icon="❌")
-                st.session_state.penalty_time += 5
-                st.session_state.se_to_play = "wrong"
+                st.markdown("""
+                <div class="feedback-box" style="background-color:#FFEBEE; border:5px solid #D32F2F;">
+                    <h1 style="color:#D32F2F; font-size:100px; margin:0;">❌</h1>
+                    <h2 style="color:#D32F2F;">ちがうよ！</h2>
+                    <p style="font-weight:bold; color:red;">+5秒</p>
+                </div>
+                """, unsafe_allow_html=True)
+                play_sound_html(SOUNDS['wrong'])
+
+            # 1秒待ってから次の問題へ
+            time.sleep(1)
+            
+            # 時間補正（判定表示時間はタイムに含めない）
+            st.session_state.start_time += 1.0
+            
+            # モードを戻して次へ
+            st.session_state.feedback_mode = False
             st.session_state.q_index += 1
+            st.rerun()
 
-        with c1:
-            if st.button(categories[0]['name'], key=f"q{q_idx}_0", type=categories[0]['color'], use_container_width=True):
-                check_answer(0)
-                st.rerun()
-        with c2:
-            if st.button(categories[1]['name'], key=f"q{q_idx}_1", type=categories[1]['color'], use_container_width=True):
-                check_answer(1)
-                st.rerun()
-        with c3:
-            if st.button(categories[2]['name'], key=f"q{q_idx}_2", type=categories[2]['color'], use_container_width=True):
-                check_answer(2)
+        # --- B. 問題出題モード ---
+        else:
+            # BGMを流す（音量小）
+            st.markdown(f"""
+                <audio autoplay loop id="bgm">
+                    <source src="{SOUNDS['bgm']}" type="audio/ogg">
+                </audio>
+                <script>document.getElementById("bgm").volume = 0.2;</script>
+            """, unsafe_allow_html=True)
+
+            q_idx = st.session_state.q_index
+            total_q = len(st.session_state.current_questions)
+
+            # 終了チェック
+            if q_idx >= total_q:
+                st.session_state.final_time = round(time.time() - st.session_state.start_time + st.session_state.penalty_time, 2)
+                st.session_state.game_state = 'FINISHED'
                 st.rerun()
 
-    # ■ 結果発表画面
+            target_item = st.session_state.current_questions[q_idx]
+
+            st.progress((q_idx / total_q), text=f"第 {q_idx + 1} 問 / 全 {total_q} 問")
+
+            st.markdown(f"""
+            <div class="question-box">
+                <div style="font-size:36px; font-weight:bold; color:#333;">
+                    {target_item['name']}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.caption("このゴミはどれ？ 👇")
+
+            c1, c2, c3 = st.columns(3)
+
+            # ボタンが押されたら「判定モード」をONにしてリロードする関数
+            def answer(choice):
+                correct = st.session_state.current_questions[q_idx]['type']
+                if choice == correct:
+                    st.session_state.feedback_result = 'correct'
+                else:
+                    st.session_state.feedback_result = 'wrong'
+                    st.session_state.penalty_time += 5
+                st.session_state.feedback_mode = True
+
+            with c1:
+                if st.button(categories[0]['name'], key=f"q{q_idx}_0", type=categories[0]['color'], use_container_width=True):
+                    answer(0)
+                    st.rerun()
+            with c2:
+                if st.button(categories[1]['name'], key=f"q{q_idx}_1", type=categories[1]['color'], use_container_width=True):
+                    answer(1)
+                    st.rerun()
+            with c3:
+                if st.button(categories[2]['name'], key=f"q{q_idx}_2", type=categories[2]['color'], use_container_width=True):
+                    answer(2)
+                    st.rerun()
+
+    # ■ クリア画面
     elif st.session_state.game_state == 'FINISHED':
-        my_time = st.session_state.final_time
-        penalty = st.session_state.penalty_time
-        
+        play_sound_html(SOUNDS['clear'])
         st.balloons()
+        
+        my_time = st.session_state.final_time
         
         st.markdown(f"""
         <div style="text-align:center; padding:20px;">
@@ -813,32 +841,23 @@ def show_sorting_game():
             <div style="font-size:50px; font-weight:bold; margin-bottom:10px;">
                 {my_time} 秒
             </div>
-            <div style="color:#D32F2F; font-weight:bold;">
-                (ペナルティ: ＋{penalty}秒 含む)
+            <div style="color:red; font-weight:bold;">
+                (ペナルティ: +{st.session_state.penalty_time}秒 含む)
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        if my_time <= 15.0: title = "👑 神レベル！"
-        elif my_time <= 25.0: title = "🥇 分別マスター！"
-        else: title = "🥉 よくがんばった！"
-        st.info(f"称号： {title}")
 
-        with st.form("ranking_form"):
-            name = st.text_input("ニックネームを入力してね")
-            
-            # 【修正】ここを type="primary" にすることで、赤色のボタンになり白飛びを防ぎます
+        with st.form("rank_form"):
+            name = st.text_input("ニックネーム")
             submitted = st.form_submit_button("ランキングに登録", type="primary", use_container_width=True)
-            
             if submitted and name:
                 st.session_state.ranking_data.append({"name": name, "time": my_time})
                 st.session_state.game_state = 'READY'
                 st.rerun()
         
-        if st.button("もういちど遊ぶ"):
+        if st.button("戻る"):
             st.session_state.game_state = 'READY'
             st.rerun()
-
 def login_screen():
     # --- おしゃれなカスタムヘッダー ---
     header_bg_url = "https://images.unsplash.com/photo-1501854140801-50d01698950b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
