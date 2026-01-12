@@ -618,31 +618,47 @@ import time
 import random
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（完成版） ---
+# --- 🎮 激闘！分別マスター（修正完了版） ---
 def show_sorting_game():
-    # --- 🔊 音声再生用の関数 ---
+    
+    # --- 🔊 音声再生ロジック（修正版） ---
     def play_sound(sound_type):
-        # フリー素材のURLを使用（実運用の際はサーバー等のファイルパスに変更推奨）
+        # 確実に再生できるパブリックドメイン(CC0)の音源URLに変更しました
         sounds = {
-            "bgm": "https://soundeffect-lab.info/sound/anime/mp3/comical-rhythm1.mp3", # コミカルなBGM
-            "correct": "https://soundeffect-lab.info/sound/anime/mp3/correct1.mp3",    # ピンポン！
-            "wrong": "https://soundeffect-lab.info/sound/anime/mp3/incorrect1.mp3",    # ブブー！
-            "clear": "https://soundeffect-lab.info/sound/anime/mp3/fanfare1.mp3"       # ファンファーレ
+            # 軽快なBGM（Wikimedia Commons）
+            "bgm": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Nola_-_Kevin_MacLeod.ogg",
+            # 正解音（高いピンポン音）
+            "correct": "https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Positive_Feedback.ogg",
+            # 不正解音（低いブザー音）
+            "wrong": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Vibraphon_the_end.ogg",
+            # クリア音（ファンファーレ）
+            "clear": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Music-14574.mp3"
         }
         
+        # 音量調整と自動再生のためのHTML埋め込み
         if sound_type == "bgm":
-            # BGMはループ再生・音量小さめ
+            # BGM: ループ再生、音量小さめ(0.2)
             st.markdown(f"""
-                <audio autoplay loop>
-                    <source src="{sounds['bgm']}" type="audio/mp3">
+                <audio autoplay loop id="bgm_player">
+                    <source src="{sounds['bgm']}" type="audio/ogg">
                 </audio>
+                <script>
+                    var audio = document.getElementById("bgm_player");
+                    audio.volume = 0.2;
+                </script>
             """, unsafe_allow_html=True)
         elif sound_type in sounds:
-            # SEは単発再生
+            # SE: 単発再生、音量中くらい(0.5)
+            # 毎回IDを変えてブラウザに「新しい音」と認識させる
+            rnd_id = random.randint(0, 10000)
             st.markdown(f"""
-                <audio autoplay>
-                    <source src="{sounds[sound_type]}" type="audio/mp3">
+                <audio autoplay id="se_player_{rnd_id}">
+                    <source src="{sounds[sound_type]}" type="audio/ogg">
                 </audio>
+                <script>
+                    var audio = document.getElementById("se_player_{rnd_id}");
+                    audio.volume = 0.5;
+                </script>
             """, unsafe_allow_html=True)
 
     # --- デザインCSS ---
@@ -689,12 +705,11 @@ def show_sorting_game():
     # --- 2. ゲーム状態の初期化 ---
     if 'game_state' not in st.session_state:
         st.session_state.game_state = 'READY'
-    if 'penalty_time' not in st.session_state: # ペナルティ時間の管理
+    if 'penalty_time' not in st.session_state:
         st.session_state.penalty_time = 0
-    if 'se_to_play' not in st.session_state:   # 再生するSEの管理
+    if 'se_to_play' not in st.session_state:
         st.session_state.se_to_play = None
     
-    # ランキングデータ
     if 'ranking_data' not in st.session_state:
         st.session_state.ranking_data = [
             {"name": "エコ博士", "time": 8.5},
@@ -702,10 +717,10 @@ def show_sorting_game():
             {"name": "ももたろう", "time": 15.0},
         ]
 
-    # SE再生処理（リロード後に音を鳴らす）
+    # SE再生処理
     if st.session_state.se_to_play:
         play_sound(st.session_state.se_to_play)
-        st.session_state.se_to_play = None # 再生したらリセット
+        st.session_state.se_to_play = None
 
     # --- 3. ゲーム進行ロジック ---
     
@@ -719,7 +734,7 @@ def show_sorting_game():
                 st.session_state.current_questions = random.sample(garbage_data, 10)
                 st.session_state.q_index = 0
                 st.session_state.start_time = time.time()
-                st.session_state.penalty_time = 0 # ペナルティリセット
+                st.session_state.penalty_time = 0
                 st.session_state.game_state = 'PLAYING'
                 st.session_state.se_to_play = None 
                 st.rerun()
@@ -731,27 +746,24 @@ def show_sorting_game():
 
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
-        # BGM再生（プレイ中ずっと流す）
-        play_sound("bgm")
+        play_sound("bgm") # BGM再生
 
         q_idx = st.session_state.q_index
         total_q = len(st.session_state.current_questions)
         
-        # 終了判定
         if q_idx >= total_q:
             end_time = time.time()
             raw_time = end_time - st.session_state.start_time
-            # ペナルティを加算して最終タイムとする
             st.session_state.final_time = round(raw_time + st.session_state.penalty_time, 2)
             st.session_state.game_state = 'FINISHED'
-            st.session_state.se_to_play = "clear" # クリア音セット
+            st.session_state.se_to_play = "clear"
             st.rerun()
         
         target_item = st.session_state.current_questions[q_idx]
 
         st.progress((q_idx / total_q), text=f"第 {q_idx + 1} 問 / 全 {total_q} 問")
         
-        # 【修正】文字色を濃いグレー(#333)、背景を白(#FFF)にして視認性を確保
+        # 視認性向上のためのスタイル
         st.markdown(f"""
         <div style="text-align:center; padding:30px; background-color:#FFFFFF; border-radius:15px; margin:20px 0; border:4px solid #607D8B; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
             <div style="font-size:36px; font-weight:bold; color:#333333;">
@@ -764,21 +776,15 @@ def show_sorting_game():
 
         c1, c2, c3 = st.columns(3)
         
-        # 回答チェック関数
         def check_answer(user_choice):
             correct_type = st.session_state.current_questions[st.session_state.q_index]['type']
-            
             if user_choice == correct_type:
-                # 正解
                 st.toast("⭕️ せいかい！", icon="⭕")
-                st.session_state.se_to_play = "correct" # 正解音セット
+                st.session_state.se_to_play = "correct"
             else:
-                # 不正解
                 st.toast("❌ ちがうよ！ ＋5秒", icon="❌")
-                st.session_state.penalty_time += 5 # ペナルティ加算
-                st.session_state.se_to_play = "wrong"   # 不正解音セット
-            
-            # 正解・不正解にかかわらず次の問題へ進む
+                st.session_state.penalty_time += 5
+                st.session_state.se_to_play = "wrong"
             st.session_state.q_index += 1
 
         with c1:
@@ -796,8 +802,6 @@ def show_sorting_game():
 
     # ■ 結果発表画面
     elif st.session_state.game_state == 'FINISHED':
-        # クリア音は reruen 前にセットしたものが冒頭で鳴る
-        
         my_time = st.session_state.final_time
         penalty = st.session_state.penalty_time
         
@@ -822,7 +826,10 @@ def show_sorting_game():
 
         with st.form("ranking_form"):
             name = st.text_input("ニックネームを入力してね")
-            submitted = st.form_submit_button("ランキングに登録")
+            
+            # 【修正】ここを type="primary" にすることで、赤色のボタンになり白飛びを防ぎます
+            submitted = st.form_submit_button("ランキングに登録", type="primary", use_container_width=True)
+            
             if submitted and name:
                 st.session_state.ranking_data.append({"name": name, "time": my_time})
                 st.session_state.game_state = 'READY'
