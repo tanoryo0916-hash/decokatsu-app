@@ -618,7 +618,7 @@ import time
 import random
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（30種類対応版） ---
+# --- 🎮 激闘！分別マスター（30種類対応・修正版） ---
 def show_sorting_game():
     st.markdown("""
     <div style="background-color:#FFF3E0; padding:15px; border-radius:15px; border:3px solid #FF9800; text-align:center; margin-bottom:20px;">
@@ -632,7 +632,7 @@ def show_sorting_game():
     </div>
     """, unsafe_allow_html=True)
 
-    # --- 1. データ定義（全30種類に増量） ---
+    # --- 1. データ定義（全30種類） ---
     # カテゴリID: 0=燃える, 1=資源, 2=埋立
     garbage_data = [
         # 🔥 燃えるゴミ (10種)
@@ -672,11 +672,12 @@ def show_sorting_game():
         {"name": "🔋 乾電池", "type": 2},
     ]
     
-    # カテゴリ名と色
+    # カテゴリ名と色設定（ここを修正しました）
+    # Streamlitのボタンは "primary"(色付き) か "secondary"(枠線のみ) しか選べません
     categories = {
-        0: {"name": "🔥 燃える", "color": "danger"},  # 赤
-        1: {"name": "♻️ 資 源", "color": "primary"},   # 青
-        2: {"name": "🧱 埋 立", "color": "secondary"} # グレー
+        0: {"name": "🔥 燃える", "color": "primary"},   # primary（目立つ色）に変更
+        1: {"name": "♻️ 資 源", "color": "primary"},    # primary（目立つ色）
+        2: {"name": "🧱 埋 立", "color": "secondary"}  # secondary（デフォルト）
     }
 
     # --- 2. ゲーム状態の初期化 ---
@@ -770,6 +771,38 @@ def show_sorting_game():
             if st.button(categories[2]['name'], key="ans_2", type=categories[2]['color'], use_container_width=True):
                 check_answer(2)
                 st.rerun()
+
+    # ■ 結果発表画面
+    elif st.session_state.game_state == 'FINISHED':
+        my_time = st.session_state.final_time
+        st.balloons()
+        
+        st.markdown(f"""
+        <div style="text-align:center; padding:10px;">
+            <h2 style="color:#E91E63;">🎉 クリア！</h2>
+            <div style="font-size:40px; font-weight:bold;">
+                Time: {my_time} 秒
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 称号判定
+        if my_time <= 10.0: title = "👑 神レベル！"
+        elif my_time <= 15.0: title = "🥇 分別マスター！"
+        else: title = "🥉 よくがんばった！"
+        st.info(f"称号： {title}")
+
+        with st.form("ranking_form"):
+            name = st.text_input("ニックネームを入力してね")
+            submitted = st.form_submit_button("ランキングに登録")
+            if submitted and name:
+                st.session_state.ranking_data.append({"name": name, "time": my_time})
+                st.session_state.game_state = 'READY'
+                st.rerun()
+        
+        if st.button("登録せずに戻る"):
+            st.session_state.game_state = 'READY'
+            st.rerun()
 
     # ■ 結果発表画面
     elif st.session_state.game_state == 'FINISHED':
