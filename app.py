@@ -622,11 +622,12 @@ import base64
 import datetime
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（BGM微音・クリア時停止版） ---
+# --- 🎮 激闘！分別マスター（BGM停止・音量調整版） ---
 def show_sorting_game():
     
-    # 📁 設定：ファイル名
+    # 📁 設定
     DATA_FILE = "ranking_log.json"
+    # ファイル名定義
     FILES = {
         "bgm": "bgm.mp3",
         "correct": "correct.mp3",
@@ -635,7 +636,7 @@ def show_sorting_game():
     }
 
     # --- 🛠️ 音声再生関数 ---
-    def get_audio_html(filename, loop=False, volume=0.5):
+    def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
         file_path = os.path.abspath(filename)
         
         if not os.path.exists(file_path):
@@ -649,26 +650,37 @@ def show_sorting_game():
         except Exception:
             return ""
 
-        rnd_id = random.randint(0, 1000000)
+        # IDが指定されていなければランダム生成
+        if element_id is None:
+            element_id = f"audio_{random.randint(0, 1000000)}"
+            
         loop_attr = "loop" if loop else ""
         
-        # volume変数をJSに渡して制御
         return f"""
             <div style="width:0; height:0; overflow:hidden;">
-                <audio id="audio_{rnd_id}" {loop_attr} autoplay>
+                <audio id="{element_id}" {loop_attr} autoplay>
                     <source src="data:{mime_type};base64,{b64}" type="audio/mp3">
                 </audio>
                 <script>
-                    var audio = document.getElementById("audio_{rnd_id}");
-                    audio.volume = {volume};
-                    var playPromise = audio.play();
-                    if (playPromise !== undefined) {{
-                        playPromise.catch(error => {{
-                            console.log("Auto-play blocked");
-                        }});
+                    var audio = document.getElementById("{element_id}");
+                    if (audio) {{
+                        audio.volume = {volume};
+                        audio.play().catch(e => console.log("Auto-play blocked"));
                     }}
                 </script>
             </div>
+        """
+
+    # --- 🛠️ BGM強制停止用スクリプト ---
+    def stop_bgm_script():
+        return """
+        <script>
+            var bgm = document.getElementById("game_bgm");
+            if (bgm) {
+                bgm.pause();
+                bgm.currentTime = 0;
+            }
+        </script>
         """
 
     # --- 🛠️ データ保存・読込 ---
@@ -698,10 +710,8 @@ def show_sorting_game():
     def get_rankings(mode="all"):
         logs = load_logs()
         if not logs: return []
-        
         today_str = datetime.date.today().isoformat()
         best_records = {} 
-
         for record in logs:
             if mode == "daily" and record["date"] != today_str:
                 continue
@@ -711,7 +721,6 @@ def show_sorting_game():
             else:
                 if record["time"] < best_records[key]["time"]:
                     best_records[key] = record
-        
         ranking_list = list(best_records.values())
         ranking_list.sort(key=lambda x: x["time"])
         return ranking_list
@@ -847,8 +856,11 @@ def show_sorting_game():
 
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
-        # ★BGM音量変更：volume=0.05 (前回の0.1の半分) に設定★
-        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.05), unsafe_allow_html=True)
+        
+        # ★BGM設定★
+        # IDを "game_bgm" に固定して、後でJavaScriptから操作できるようにする
+        # 音量: 0.02 (0.05のさらに半分以下)
+        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.02, element_id="game_bgm"), unsafe_allow_html=True)
 
         q_idx = st.session_state.q_index
         total_q = len(st.session_state.current_questions)
@@ -887,12 +899,13 @@ def show_sorting_game():
 
         # 判定表示
         if st.session_state.feedback_mode:
+            # ★SE設定★ volume=1.0 (最大値)
             if st.session_state.feedback_result == 'correct':
                 st.markdown("""<div class="feedback-overlay" style="border:5px solid #4CAF50; background-color:#E8F5E9;"><h1 style="color:#2E7D32; font-size:80px; margin:0;">⭕️</h1><h2 style="color:#2E7D32; margin:0;">せいかい！</h2></div>""", unsafe_allow_html=True)
-                st.markdown(get_audio_html(FILES["correct"], volume=0.5), unsafe_allow_html=True)
+                st.markdown(get_audio_html(FILES["correct"], volume=1.0), unsafe_allow_html=True)
             else:
                 st.markdown("""<div class="feedback-overlay" style="border:5px solid #D32F2F; background-color:#FFEBEE;"><h1 style="color:#D32F2F; font-size:80px; margin:0;">❌</h1><h2 style="color:#D32F2F; margin:0;">ちがうよ！</h2><p style="font-weight:bold; color:red; font-size:20px;">+5秒</p></div>""", unsafe_allow_html=True)
-                st.markdown(get_audio_html(FILES["wrong"], volume=0.5), unsafe_allow_html=True)
+                st.markdown(get_audio_html(FILES["wrong"], volume=1.0), unsafe_allow_html=True)
 
             time.sleep(1)
             st.session_state.start_time += 1.0
@@ -908,10 +921,16 @@ def show_sorting_game():
                 st.session_state.q_index += 1
             st.rerun()
 
-    # ■ クリア画面（BGMタグがないため、自然にBGMが停止します）
+    # ■ クリア画面
     elif st.session_state.game_state == 'FINISHED':
-        st.markdown(get_audio_html(FILES["clear"], volume=0.5), unsafe_allow_html=True)
+        # ★BGM停止★ 
+        # JavaScriptを注入してID "game_bgm" のオーディオを強制的にPauseする
+        st.markdown(stop_bgm_script(), unsafe_allow_html=True)
+        
+        # ★クリア音設定★ volume=1.0 (最大値)
+        st.markdown(get_audio_html(FILES["clear"], volume=1.0), unsafe_allow_html=True)
         st.balloons()
+        
         my_time = st.session_state.final_time
         name, school = get_user_info()
 
