@@ -5,6 +5,7 @@ import json
 import os
 import base64
 import datetime
+import pandas as pd  # マトリクス表のためにpandasを追加
 
 # ==========================================
 # 1. 初期設定 & 定数定義
@@ -19,7 +20,7 @@ st.set_page_config(
 USER_DB_FILE = "users_db.json"
 RANKING_FILE = "ranking_log.json"
 
-# 音声ファイル定義（BGMは削除）
+# 音声ファイル定義
 FILES = {
     "correct": "correct.mp3",
     "wrong": "wrong.mp3",
@@ -96,7 +97,6 @@ def get_audio_html(filename, loop=False, volume=0.5, element_id=None):
     if element_id is None: element_id = f"audio_{random.randint(0, 1000000)}"
     loop_attr = "loop" if loop else ""
     
-    # SE(効果音)用：音量は引数で指定
     return f"""
         <div style="width:0; height:0; overflow:hidden;">
             <audio id="{element_id}" {loop_attr} autoplay onplay="this.volume={volume}">
@@ -104,6 +104,16 @@ def get_audio_html(filename, loop=False, volume=0.5, element_id=None):
             </audio>
         </div>
     """
+
+def show_footer():
+    st.markdown("""
+    <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
+        <p><strong>主催：</strong> おかやまデコ活応援隊</p>
+        <p><strong>協賛：</strong> 地球を守るみんなの会社</p>
+        <p><strong>後援：</strong> 岡山県 / 倉敷市 / 岡山市 / 環境省中国四国地方環境事務所</p>
+        <p style="text-align: center; margin-top: 10px;">© 2024 Okayama Decokatsu Project</p>
+    </div>
+    """, unsafe_allow_html=True)
 
 # ==========================================
 # 4. ゲーム機能本体 (Game)
@@ -170,7 +180,6 @@ def show_sorting_game():
                 for i, r in enumerate(ar[:10]): st.markdown(f"**{i+1}位**：`{r['time']}秒` ({r['name']} / {r['school']})")
 
     elif st.session_state.game_state == 'PLAYING':
-        # BGM再生コード削除済み
         if st.session_state.q_index >= len(st.session_state.current_questions): st.session_state.game_state = 'FINISHED'; st.rerun()
 
         q_idx = st.session_state.q_index
@@ -225,18 +234,17 @@ def show_sorting_game():
             st.session_state.game_state = 'READY'; st.rerun()
 
 # ==========================================
-# 5. デコ活チャレンジ機能 (Challenges)
+# 5. デコ活チャレンジ機能 (Matrix Table)
 # ==========================================
 def show_challenge_sheet():
-    st.markdown("""<div style="background-color:#E1F5FE; padding:15px; border-radius:10px; border-left:5px solid #03A9F4; margin-top:20px;"><h3 style="color:#0277BD; margin:0;">📝 デコ活チャレンジ！</h3><p style="margin:0; font-size:14px;">きょう、できたことにチェックをいれよう！</p></div>""", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background-color:#E1F5FE; padding:15px; border-radius:10px; border-left:5px solid #03A9F4; margin-top:20px;">
+        <h3 style="color:#0277BD; margin:0;">📝 デコ活チャレンジ マトリクス</h3>
+        <p style="margin:0; font-size:14px;">できたことにチェックを入れてね！</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-    challenges = {
-        "🥦 食べる (食品ロス)": ["給食やご飯を残さず食べた", "野菜をたくさん食べた", "賞味期限が近いものから食べた"],
-        "💡 住む (省エネ・節水)": ["見ていないテレビを消した", "部屋を出るとき電気を消した", "水を出しっぱなしにしなかった"],
-        "🎁 買う・捨てる (3R)": ["マイバッグを持って買い物に行った", "ゴミを正しく分別して捨てた", "壊れたものを直して使った"],
-        "🚗 移動など (その他)": ["近くなら歩いて行った", "外で元気に遊んだ", "家族とエコの話をした"]
-    }
-
+    # ユーザー情報 & データ取得
     user_info = st.session_state.user_info
     user_key = f"{user_info['school']}_{user_info['grade']}_{user_info['name']}"
     today_str = datetime.date.today().isoformat()
@@ -244,24 +252,60 @@ def show_challenge_sheet():
     history = saved_data.get("challenge_history", {})
     today_checks = history.get(today_str, [])
 
-    with st.form("challenge_form"):
-        new_checks = []
-        for category, items in challenges.items():
-            st.markdown(f"**{category}**")
-            for item in items:
-                is_checked = item in today_checks
-                if st.checkbox(item, value=is_checked): new_checks.append(item)
-            st.write("")
+    # マトリクスデータの準備
+    challenges = {
+        "🥦 食べる (食品ロス)": ["給食やご飯を残さず食べた", "野菜をたくさん食べた", "賞味期限が近いものから食べた"],
+        "💡 住む (省エネ・節水)": ["見ていないテレビを消した", "部屋を出るとき電気を消した", "水を出しっぱなしにしなかった"],
+        "🎁 買う・捨てる (3R)": ["マイバッグを持って買い物に行った", "ゴミを正しく分別して捨てた", "壊れたものを直して使った"],
+        "🚗 移動など (その他)": ["近くなら歩いて行った", "外で元気に遊んだ", "家族とエコの話をした"]
+    }
+
+    # DataFrame用のリスト作成
+    table_data = []
+    for category, items in challenges.items():
+        for item in items:
+            is_checked = item in today_checks
+            table_data.append({
+                "カテゴリー": category,
+                "チャレンジ内容": item,
+                "できた！": is_checked
+            })
+
+    # DataFrame作成
+    df = pd.DataFrame(table_data)
+
+    # データエディタ（マトリクス表）表示
+    # できた！列だけ編集可能にする
+    edited_df = st.data_editor(
+        df,
+        column_config={
+            "カテゴリー": st.column_config.TextColumn("カテゴリー", disabled=True),
+            "チャレンジ内容": st.column_config.TextColumn("チャレンジ内容", disabled=True),
+            "できた！": st.column_config.CheckboxColumn("できた！", help="できたらチェック！")
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="challenge_matrix"
+    )
+
+    # 保存ボタン
+    if st.button("✅ チェックを保存する", type="primary", use_container_width=True):
+        # チェックがついている項目だけ抽出
+        checked_items = edited_df[edited_df["できた！"] == True]["チャレンジ内容"].tolist()
         
-        submitted = st.form_submit_button("✅ チェックを保存する", type="primary", use_container_width=True)
-        if submitted:
-            history[today_str] = new_checks
-            saved_data["challenge_history"] = history
-            save_user(user_key, saved_data)
-            count = len(new_checks)
-            if count == 0: st.warning("チェックが入っていないよ？")
-            elif count < 5: st.success(f"保存しました！ {count}個達成！明日もがんばろう！")
-            else: st.success(f"すごい！！ {count}個も達成！デコ活マスターだね！🎉"); st.balloons()
+        # 保存処理
+        history[today_str] = checked_items
+        saved_data["challenge_history"] = history
+        save_user(user_key, saved_data)
+        
+        count = len(checked_items)
+        if count == 0:
+            st.warning("チェックが入っていないよ？")
+        elif count < 5:
+            st.success(f"保存しました！ {count}個達成！明日もがんばろう！")
+        else:
+            st.success(f"すごい！！ {count}個も達成！デコ活マスターだね！🎉")
+            st.balloons()
 
 # ==========================================
 # 6. ログイン & メイン画面制御 (自動ログイン対応)
@@ -272,8 +316,16 @@ def login_screen():
 
     col1, col2 = st.columns(2)
     with col1:
-        # 小学校名は自由入力に変更
-        school = st.text_input("小学校のなまえ", placeholder="例：〇〇小学校")
+        # 小学校名は自由入力（「小学校」は自動補完）
+        school_input = st.text_input("小学校のなまえ", placeholder="例：岡山中央")
+        st.caption("※「小学校」は書かなくていいよ")
+        
+        # 入力があれば末尾に「小学校」をつける処理
+        if school_input and not school_input.endswith("小学校"):
+            school = school_input + "小学校"
+        else:
+            school = school_input
+
     with col2:
         grade = st.selectbox("何年生？", ["1年生", "2年生", "3年生", "4年生", "5年生", "6年生"])
 
@@ -281,13 +333,12 @@ def login_screen():
     st.markdown("---")
     
     if st.button("🚀 スタート！", type="primary", use_container_width=True):
-        if not school or not name:
+        if not school_input or not name:
             st.error("小学校名とニックネームを入れてね！")
         else:
             user_key = f"{school}_{grade}_{name}"
             users = load_json(USER_DB_FILE)
             
-            # データ保存・更新
             if user_key in users:
                 user_data = users[user_key]
                 st.toast(f"おかえりなさい！ {name} さん", icon="👋")
@@ -296,15 +347,15 @@ def login_screen():
                 save_user(user_key, user_data)
                 st.toast(f"はじめまして！ {name} さん", icon="✨")
             
-            # セッションとURLパラメータに保存
             st.session_state.user_info = user_data
             st.session_state.logged_in = True
-            
-            # URLパラメータを設定（自動ログイン用）
             st.query_params["uid"] = user_key
             st.rerun()
             
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    # ログイン画面のフッター
+    show_footer()
 
 def main_screen():
     user = st.session_state.user_info
@@ -316,39 +367,35 @@ def main_screen():
     </div>
     """, unsafe_allow_html=True)
 
-    # 次回の自動ログイン案内
     with st.expander("ℹ️ 次から自動でログインするには？"):
         st.info("このページを **「ブックマーク（お気に入り）」** に登録してね！\n次にそのブックマークから開くと、名前を入れなくてもログインできるよ！")
 
     show_sorting_game()
     st.markdown("---")
     show_challenge_sheet()
+    
+    # フッター表示
+    show_footer()
+    
     st.markdown("---")
     if st.button("ログアウト（おわるときにおしてね）"):
         st.session_state.logged_in = False
         st.session_state.game_state = 'READY'
-        st.query_params.clear() # URLパラメータも消去
+        st.query_params.clear()
         st.rerun()
 
 # ==========================================
 # 7. アプリ実行エントリーポイント
 # ==========================================
-# 自動ログインチェック
 if not st.session_state.get('logged_in', False):
-    # URLパラメータに 'uid' があるか確認
     params = st.query_params
     if "uid" in params:
         user_key = params["uid"]
         saved_users = load_json(USER_DB_FILE)
-        
-        # 登録済みユーザーなら自動ログイン
         if user_key in saved_users:
             st.session_state.user_info = saved_users[user_key]
             st.session_state.logged_in = True
-            st.toast(f"自動ログインしました！ こんにちは {saved_users[user_key]['name']} さん！", icon="🚀")
-            # 念のためrerunして画面更新
-            # (ただし無限ループ防止のため、session stateにフラグが立っていればスキップしたいが、Streamlitの仕様上rerunが無難)
-            # ここでは描画フローに任せる
+            st.toast(f"自動ログインしました！", icon="🚀")
 
 if not st.session_state.get('logged_in', False):
     login_screen()
