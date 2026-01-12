@@ -618,7 +618,7 @@ import time
 import random
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（ランキング強化版） ---
+# --- 🎮 激闘！分別マスター（自動入力版） ---
 def show_sorting_game():
     
     # --- 🔊 音声再生用コンポーネント ---
@@ -704,9 +704,9 @@ def show_sorting_game():
     if 'game_state' not in st.session_state:
         st.session_state.game_state = 'READY'
     
-    # 【変更】初期データを空にする
+    # ランキング初期化
     if 'ranking_data' not in st.session_state:
-        st.session_state.ranking_data = [] 
+        st.session_state.ranking_data = []
 
     if 'penalty_time' not in st.session_state:
         st.session_state.penalty_time = 0
@@ -732,15 +732,12 @@ def show_sorting_game():
                 st.session_state.game_state = 'PLAYING'
                 st.rerun()
 
-        # ランキング表示（10位まで・学校名込み）
         with st.expander("🏆 ランキングを見る", expanded=True):
             if not st.session_state.ranking_data:
                 st.write("まだランキングはありません。1位をねらおう！")
             else:
                 sorted_rank = sorted(st.session_state.ranking_data, key=lambda x: x['time'])
-                # 【変更】10位まで表示
                 for i, r in enumerate(sorted_rank[:10]):
-                    # 学校名がない古いデータ対策で .get を使用
                     school_name = r.get('school', '')
                     display_school = f" / {school_name}" if school_name else ""
                     
@@ -833,52 +830,58 @@ def show_sorting_game():
                     answer(2)
                     st.rerun()
 
-    # ■ クリア画面
+    # ■ クリア画面（自動登録機能）
     elif st.session_state.game_state == 'FINISHED':
         play_sound_html(SOUNDS['clear'])
         st.balloons()
         
         my_time = st.session_state.final_time
         
+        # --- 自動入力のためのデータ取得 ---
+        # ログイン情報を取得（なければゲスト扱い）
+        user_info = st.session_state.get('user_info', {})
+        player_name = user_info.get('name', 'ゲスト')
+        player_school = user_info.get('school', '学校なし')
+
         st.markdown(f"""
         <div style="text-align:center; padding:20px;">
             <h2 style="color:#E91E63;">🎉 ゲームクリア！</h2>
             <div style="font-size:50px; font-weight:bold; margin-bottom:10px;">
                 {my_time} 秒
             </div>
-            <div style="color:red; font-weight:bold;">
+            <div style="color:red; font-weight:bold; margin-bottom:20px;">
                 (ペナルティ: +{st.session_state.penalty_time}秒 含む)
+            </div>
+            
+            <div style="background-color:#E3F2FD; padding:15px; border-radius:10px; border:2px solid #2196F3;">
+                <p style="margin:0; font-size:14px; color:#555;">この名前でランキングに登録するよ！</p>
+                <div style="font-size:20px; font-weight:bold; color:#0D47A1; margin-top:5px;">
+                    {player_school}　{player_name} さん
+                </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-
-        # 【変更】登録フォームに学校名を追加
-        with st.form("rank_form"):
-            st.write("ランキングにとうろくしよう！")
-            col_a, col_b = st.columns(2)
-            with col_a:
-                name = st.text_input("ニックネーム", placeholder="例：たろう")
-            with col_b:
-                school = st.text_input("学校名", placeholder="例：〇〇小")
-            
-            submitted = st.form_submit_button("ランキングに登録", type="primary", use_container_width=True)
-            
-            if submitted:
-                if name and school:
-                    # 学校名も一緒に保存
-                    st.session_state.ranking_data.append({
-                        "name": name,
-                        "school": school,
-                        "time": my_time
-                    })
-                    st.session_state.game_state = 'READY'
-                    st.rerun()
-                else:
-                    st.error("ニックネームと学校名をいれてね！")
         
-        if st.button("戻る"):
-            st.session_state.game_state = 'READY'
-            st.rerun()
+        st.write("") # スペース
+
+        # ボタン配置
+        col_reg, col_back = st.columns(2)
+        
+        with col_reg:
+            # 入力フォームなしで、ボタンを押すだけで登録
+            if st.button("ランキングに登録する", type="primary", use_container_width=True):
+                st.session_state.ranking_data.append({
+                    "name": player_name,
+                    "school": player_school,
+                    "time": my_time
+                })
+                st.session_state.game_state = 'READY'
+                st.rerun()
+        
+        with col_back:
+            if st.button("登録せずに戻る", use_container_width=True):
+                st.session_state.game_state = 'READY'
+                st.rerun()
             
 def login_screen():
     # --- おしゃれなカスタムヘッダー ---
