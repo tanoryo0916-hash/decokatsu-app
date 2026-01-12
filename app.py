@@ -618,22 +618,70 @@ import time
 import random
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（自動入力版） ---
+# --- 🎮 激闘！分別マスター（不具合修正・機能追加版） ---
 def show_sorting_game():
     
-    # --- 🔊 音声再生用コンポーネント ---
+    # --- 🛠️ ヘルパー関数: ユーザー情報の取得 ---
+    def get_user_info():
+        # ログイン情報がない場合はゲスト扱い
+        info = st.session_state.get('user_info', {})
+        name = info.get('name', 'ゲスト')
+        school = info.get('school', '体験入学校')
+        return name, school
+
+    # --- 🛠️ ヘルパー関数: 自己ベスト取得 ---
+    def get_personal_best():
+        name, school = get_user_info()
+        # ランキングから自分の記録を探す
+        for r in st.session_state.ranking_data:
+            if r['name'] == name and r['school'] == school:
+                return r['time']
+        return None  # 記録なし
+
+    # --- 🛠️ ヘルパー関数: ランキング更新（重複なし・最速のみ） ---
+    def update_ranking(new_time):
+        name, school = get_user_info()
+        ranking = st.session_state.ranking_data
+        
+        # 既存の記録を探す
+        found_index = -1
+        for i, r in enumerate(ranking):
+            if r['name'] == name and r['school'] == school:
+                found_index = i
+                break
+        
+        if found_index != -1:
+            # 記録あり：タイムが速ければ更新
+            if new_time < ranking[found_index]['time']:
+                ranking[found_index]['time'] = new_time
+                return "update" # 更新した
+            else:
+                return "no_update" # 更新ならず
+        else:
+            # 記録なし：新規追加
+            ranking.append({
+                "name": name,
+                "school": school,
+                "time": new_time
+            })
+            return "new" # 新規登録
+
+    # --- 🔊 音声再生 ---
     def play_sound_html(sound_url):
         rnd = random.randint(0, 100000)
+        # HTMLの表示崩れを防ぐため、不可視コンテナを使用
         st.markdown(f"""
-            <audio autoplay="true" style="display:none;">
-                <source src="{sound_url}" type="audio/ogg">
-                <source src="{sound_url}" type="audio/mp3">
-            </audio>
-            <script>
-                var audio_{rnd} = new Audio("{sound_url}");
-                audio_{rnd}.volume = 0.5;
-                audio_{rnd}.play();
-            </script>
+            <div style="display:none;">
+                <audio autoplay="true">
+                    <source src="{sound_url}" type="audio/ogg">
+                    <source src="{sound_url}" type="audio/mp3">
+                </audio>
+                <script>
+                    var audio_{rnd} = new Audio("{sound_url}");
+                    audio_{rnd}.volume = 0.5;
+                    audio_{rnd}.play();
+                </script>
+            </div>
         """, unsafe_allow_html=True)
 
     SOUNDS = {
@@ -643,33 +691,30 @@ def show_sorting_game():
         "clear": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Music-14574.mp3"
     }
 
-    # --- デザインCSS ---
+    # --- 🎨 デザインCSS（安全な記述に変更） ---
     st.markdown("""
     <style>
         .game-header {
             background-color:#FFF3E0; padding:15px; border-radius:15px; 
-            border:3px solid #FF9800; text-align:center; margin-bottom:20px;
+            border:3px solid #FF9800; text-align:center; margin-bottom:10px;
         }
         .question-box {
-            text-align:center; padding:30px; background-color:#FFFFFF; 
+            text-align:center; padding:20px; background-color:#FFFFFF; 
             border-radius:15px; margin:20px 0; border:4px solid #607D8B;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .feedback-box {
+        .feedback-overlay {
             position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 9999; padding: 40px; border-radius: 20px; text-align: center;
-            width: 80%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            z-index: 9999; padding: 30px; border-radius: 20px; text-align: center;
+            width: 80%; max-width: 350px; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            background-color: white;
+        }
+        .personal-best {
+            text-align: right; font-size: 14px; color: #555; 
+            background-color: #f0f2f6; padding: 5px 10px; border-radius: 5px;
+            margin-top: 5px;
         }
     </style>
-    <div class="game-header">
-        <div style="font-size:22px; font-weight:bold; color:#E65100; margin-bottom:5px;">
-            ⏱️ 激闘！分別マスター
-        </div>
-        <div style="font-size:14px; color:#333;">
-            全10問！ タイムアタック！<br>
-            <span style="color:red; font-weight:bold;">※ まちがえると ＋5秒 ペナルティ！</span>
-        </div>
-    </div>
     """, unsafe_allow_html=True)
 
     # --- 1. データ定義 ---
@@ -703,11 +748,8 @@ def show_sorting_game():
     # --- 2. ステート管理 ---
     if 'game_state' not in st.session_state:
         st.session_state.game_state = 'READY'
-    
-    # ランキング初期化
     if 'ranking_data' not in st.session_state:
-        st.session_state.ranking_data = []
-
+        st.session_state.ranking_data = [] # 初期データなし
     if 'penalty_time' not in st.session_state:
         st.session_state.penalty_time = 0
     if 'feedback_mode' not in st.session_state:
@@ -715,13 +757,35 @@ def show_sorting_game():
     if 'feedback_result' not in st.session_state:
         st.session_state.feedback_result = None
 
+    # ヘッダー表示（共通）
+    st.markdown("""
+    <div class="game-header">
+        <div style="font-size:22px; font-weight:bold; color:#E65100;">
+            ⏱️ 激闘！分別マスター
+        </div>
+        <div style="font-size:14px; color:#333;">
+            10問タイムアタック / <span style="color:red; font-weight:bold;">ミス ＋5秒</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # 自己ベスト表示（常時表示）
+    my_best = get_personal_best()
+    best_str = f"{my_best} 秒" if my_best else "記録なし"
+    st.markdown(f"""
+    <div class="personal-best">
+        👑 キミの最速記録： <strong>{best_str}</strong>
+    </div>
+    """, unsafe_allow_html=True)
+
+
     # --- 3. ゲーム進行 ---
     
     # ■ スタート画面
     if st.session_state.game_state == 'READY':
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.info("👇 **スタート** を押してゲーム開始！ 音が出ます🔊")
+            st.info("👇 **スタート** を押してゲーム開始！(音が出ます)")
         with col2:
             if st.button("🏁 スタート！", use_container_width=True, type="primary"):
                 st.session_state.current_questions = random.sample(garbage_data, 10)
@@ -732,19 +796,20 @@ def show_sorting_game():
                 st.session_state.game_state = 'PLAYING'
                 st.rerun()
 
-        with st.expander("🏆 ランキングを見る", expanded=True):
+        # ランキング表示
+        with st.expander("🏆 みんなのランキング（トップ10）", expanded=True):
             if not st.session_state.ranking_data:
                 st.write("まだランキングはありません。1位をねらおう！")
             else:
                 sorted_rank = sorted(st.session_state.ranking_data, key=lambda x: x['time'])
                 for i, r in enumerate(sorted_rank[:10]):
-                    school_name = r.get('school', '')
-                    display_school = f" / {school_name}" if school_name else ""
+                    s_name = r.get('school', '')
+                    d_school = f" / {s_name}" if s_name else ""
                     
                     st.markdown(f"""
-                    <div style='background-color:white; padding:5px; margin-bottom:5px; border-radius:5px; border-bottom:1px solid #ddd;'>
-                        <strong>{i+1}位</strong>： <span style='color:#E91E63; font-weight:bold;'>{r['time']}秒</span>
-                        <span style='color:#555;'>（{r['name']}{display_school}）</span>
+                    <div style='background-color:white; padding:5px; margin-bottom:5px; border-bottom:1px solid #eee;'>
+                        <strong>{i+1}位</strong> <span style='color:#E91E63; font-weight:bold;'>{r['time']}秒</span>
+                        <small style='color:#666;'>（{r['name']}{d_school}）</small>
                     </div>
                     """, unsafe_allow_html=True)
 
@@ -755,40 +820,44 @@ def show_sorting_game():
         if st.session_state.feedback_mode:
             if st.session_state.feedback_result == 'correct':
                 st.markdown("""
-                <div class="feedback-box" style="background-color:#E8F5E9; border:5px solid #4CAF50;">
-                    <h1 style="color:#2E7D32; font-size:100px; margin:0;">⭕️</h1>
-                    <h2 style="color:#2E7D32;">せいかい！</h2>
+                <div class="feedback-overlay" style="border:5px solid #4CAF50; background-color:#E8F5E9;">
+                    <h1 style="color:#2E7D32; font-size:80px; margin:0;">⭕️</h1>
+                    <h2 style="color:#2E7D32; margin:0;">せいかい！</h2>
                 </div>
                 """, unsafe_allow_html=True)
                 play_sound_html(SOUNDS['correct'])
             else:
                 st.markdown("""
-                <div class="feedback-box" style="background-color:#FFEBEE; border:5px solid #D32F2F;">
-                    <h1 style="color:#D32F2F; font-size:100px; margin:0;">❌</h1>
-                    <h2 style="color:#D32F2F;">ちがうよ！</h2>
-                    <p style="font-weight:bold; color:red;">+5秒</p>
+                <div class="feedback-overlay" style="border:5px solid #D32F2F; background-color:#FFEBEE;">
+                    <h1 style="color:#D32F2F; font-size:80px; margin:0;">❌</h1>
+                    <h2 style="color:#D32F2F; margin:0;">ちがうよ！</h2>
+                    <p style="font-weight:bold; color:red; font-size:20px;">+5秒</p>
                 </div>
                 """, unsafe_allow_html=True)
                 play_sound_html(SOUNDS['wrong'])
 
-            time.sleep(1)
-            st.session_state.start_time += 1.0
+            time.sleep(1) # 1秒停止
+            st.session_state.start_time += 1.0 # タイム補正
             st.session_state.feedback_mode = False
             st.session_state.q_index += 1
             st.rerun()
 
         # --- B. 問題出題モード ---
         else:
+            # BGM
             st.markdown(f"""
-                <audio autoplay loop id="bgm">
-                    <source src="{SOUNDS['bgm']}" type="audio/ogg">
-                </audio>
-                <script>document.getElementById("bgm").volume = 0.2;</script>
+                <div style="display:none;">
+                    <audio autoplay loop id="bgm">
+                        <source src="{SOUNDS['bgm']}" type="audio/ogg">
+                    </audio>
+                    <script>document.getElementById("bgm").volume = 0.2;</script>
+                </div>
             """, unsafe_allow_html=True)
 
             q_idx = st.session_state.q_index
             total_q = len(st.session_state.current_questions)
 
+            # 終了チェック
             if q_idx >= total_q:
                 st.session_state.final_time = round(time.time() - st.session_state.start_time + st.session_state.penalty_time, 2)
                 st.session_state.game_state = 'FINISHED'
@@ -799,7 +868,7 @@ def show_sorting_game():
 
             st.markdown(f"""
             <div class="question-box">
-                <div style="font-size:36px; font-weight:bold; color:#333;">
+                <div style="font-size:32px; font-weight:bold; color:#333;">
                     {target_item['name']}
                 </div>
             </div>
@@ -818,70 +887,59 @@ def show_sorting_game():
                 st.session_state.feedback_mode = True
 
             with c1:
-                if st.button(categories[0]['name'], key=f"q{q_idx}_0", type=categories[0]['color'], use_container_width=True):
+                if st.button(categories[0]['name'], key=f"btn_{q_idx}_0", type=categories[0]['color'], use_container_width=True):
                     answer(0)
                     st.rerun()
             with c2:
-                if st.button(categories[1]['name'], key=f"q{q_idx}_1", type=categories[1]['color'], use_container_width=True):
+                if st.button(categories[1]['name'], key=f"btn_{q_idx}_1", type=categories[1]['color'], use_container_width=True):
                     answer(1)
                     st.rerun()
             with c3:
-                if st.button(categories[2]['name'], key=f"q{q_idx}_2", type=categories[2]['color'], use_container_width=True):
+                if st.button(categories[2]['name'], key=f"btn_{q_idx}_2", type=categories[2]['color'], use_container_width=True):
                     answer(2)
                     st.rerun()
 
-    # ■ クリア画面（自動登録機能）
+    # ■ クリア画面（コード表示バグ修正・自動更新）
     elif st.session_state.game_state == 'FINISHED':
         play_sound_html(SOUNDS['clear'])
         st.balloons()
         
         my_time = st.session_state.final_time
-        
-        # --- 自動入力のためのデータ取得 ---
-        # ログイン情報を取得（なければゲスト扱い）
-        user_info = st.session_state.get('user_info', {})
-        player_name = user_info.get('name', 'ゲスト')
-        player_school = user_info.get('school', '学校なし')
+        name, school = get_user_info()
 
+        # レイアウトを整える
         st.markdown(f"""
-        <div style="text-align:center; padding:20px;">
-            <h2 style="color:#E91E63;">🎉 ゲームクリア！</h2>
-            <div style="font-size:50px; font-weight:bold; margin-bottom:10px;">
-                {my_time} 秒
+        <div style="text-align:center; padding:20px; background-color:white; border-radius:15px; border:2px solid #eee;">
+            <h2 style="color:#E91E63; margin:0;">🎉 ゲームクリア！</h2>
+            <div style="font-size:50px; font-weight:bold; color:#333; margin:10px 0;">
+                {my_time} <span style="font-size:20px;">秒</span>
             </div>
-            <div style="color:red; font-weight:bold; margin-bottom:20px;">
-                (ペナルティ: +{st.session_state.penalty_time}秒 含む)
+            <div style="color:red; font-size:14px; margin-bottom:15px;">
+                (ペナルティ +{st.session_state.penalty_time}秒 含む)
             </div>
-            
-            <div style="background-color:#E3F2FD; padding:15px; border-radius:10px; border:2px solid #2196F3;">
-                <p style="margin:0; font-size:14px; color:#555;">この名前でランキングに登録するよ！</p>
-                <div style="font-size:20px; font-weight:bold; color:#0D47A1; margin-top:5px;">
-                    {player_school}　{player_name} さん
-                </div>
+            <div style="background-color:#E3F2FD; padding:10px; border-radius:10px; color:#0D47A1;">
+                <strong>{school}</strong> の <strong>{name}</strong> さん
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        st.write("") # スペース
+        st.write("") # 余白
 
-        # ボタン配置
-        col_reg, col_back = st.columns(2)
-        
-        with col_reg:
-            # 入力フォームなしで、ボタンを押すだけで登録
-            if st.button("ランキングに登録する", type="primary", use_container_width=True):
-                st.session_state.ranking_data.append({
-                    "name": player_name,
-                    "school": player_school,
-                    "time": my_time
-                })
-                st.session_state.game_state = 'READY'
-                st.rerun()
-        
-        with col_back:
-            if st.button("登録せずに戻る", use_container_width=True):
-                st.session_state.game_state = 'READY'
-                st.rerun()
+        # ボタン
+        if st.button("ランキングを登録して戻る", type="primary", use_container_width=True):
+            # 重複チェック＆更新処理
+            result = update_ranking(my_time)
+            
+            if result == "new":
+                st.toast("ランキングに新しく登録しました！", icon="✨")
+            elif result == "update":
+                st.toast("自己ベスト更新！おめでとう！", icon="🚀")
+            else:
+                st.toast("自己ベスト更新ならず… また挑戦してね！", icon="💪")
+            
+            time.sleep(1.5) # トーストを表示する時間を確保
+            st.session_state.game_state = 'READY'
+            st.rerun()
             
 def login_screen():
     # --- おしゃれなカスタムヘッダー ---
