@@ -622,10 +622,10 @@ import base64
 import datetime
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（最終完成版） ---
+# --- 🎮 激闘！分別マスター（BGM微音・クリア時停止版） ---
 def show_sorting_game():
     
-    # 📁 設定：ファイル名（大文字小文字に注意）
+    # 📁 設定：ファイル名
     DATA_FILE = "ranking_log.json"
     FILES = {
         "bgm": "bgm.mp3",
@@ -652,6 +652,7 @@ def show_sorting_game():
         rnd_id = random.randint(0, 1000000)
         loop_attr = "loop" if loop else ""
         
+        # volume変数をJSに渡して制御
         return f"""
             <div style="width:0; height:0; overflow:hidden;">
                 <audio id="audio_{rnd_id}" {loop_attr} autoplay>
@@ -846,8 +847,8 @@ def show_sorting_game():
 
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
-        # ★BGM音量変更：volume=0.1 にしました★
-        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.1), unsafe_allow_html=True)
+        # ★BGM音量変更：volume=0.05 (前回の0.1の半分) に設定★
+        st.markdown(get_audio_html(FILES["bgm"], loop=True, volume=0.05), unsafe_allow_html=True)
 
         q_idx = st.session_state.q_index
         total_q = len(st.session_state.current_questions)
@@ -888,10 +889,10 @@ def show_sorting_game():
         if st.session_state.feedback_mode:
             if st.session_state.feedback_result == 'correct':
                 st.markdown("""<div class="feedback-overlay" style="border:5px solid #4CAF50; background-color:#E8F5E9;"><h1 style="color:#2E7D32; font-size:80px; margin:0;">⭕️</h1><h2 style="color:#2E7D32; margin:0;">せいかい！</h2></div>""", unsafe_allow_html=True)
-                st.markdown(get_audio_html(FILES["correct"]), unsafe_allow_html=True)
+                st.markdown(get_audio_html(FILES["correct"], volume=0.5), unsafe_allow_html=True)
             else:
                 st.markdown("""<div class="feedback-overlay" style="border:5px solid #D32F2F; background-color:#FFEBEE;"><h1 style="color:#D32F2F; font-size:80px; margin:0;">❌</h1><h2 style="color:#D32F2F; margin:0;">ちがうよ！</h2><p style="font-weight:bold; color:red; font-size:20px;">+5秒</p></div>""", unsafe_allow_html=True)
-                st.markdown(get_audio_html(FILES["wrong"]), unsafe_allow_html=True)
+                st.markdown(get_audio_html(FILES["wrong"], volume=0.5), unsafe_allow_html=True)
 
             time.sleep(1)
             st.session_state.start_time += 1.0
@@ -907,9 +908,9 @@ def show_sorting_game():
                 st.session_state.q_index += 1
             st.rerun()
 
-    # ■ クリア画面
+    # ■ クリア画面（BGMタグがないため、自然にBGMが停止します）
     elif st.session_state.game_state == 'FINISHED':
-        st.markdown(get_audio_html(FILES["clear"]), unsafe_allow_html=True)
+        st.markdown(get_audio_html(FILES["clear"], volume=0.5), unsafe_allow_html=True)
         st.balloons()
         my_time = st.session_state.final_time
         name, school = get_user_info()
