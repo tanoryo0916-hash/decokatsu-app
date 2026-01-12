@@ -618,27 +618,34 @@ import time
 import random
 import json
 import os
-import base64 # 音声変換用に追加
+import base64
 import datetime
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（完全版：ローカル音声＆自動保存） ---
+# --- 🎮 激闘！分別マスター（ルートディレクトリ音源版） ---
 def show_sorting_game():
     
     # 📁 設定
     DATA_FILE = "ranking_log.json"
-    SOUND_DIR = "sounds" # 音声ファイルを入れるフォルダ名
+    SOUND_DIR = "." # "." は「app.pyと同じ場所」を指します
 
     # --- 🛠️ 音声再生関数（ローカルファイル読込版） ---
     def get_audio_html(filename, loop=False, volume=0.5):
         filepath = os.path.join(SOUND_DIR, filename)
+        
+        # ファイルが存在するかチェック
         if not os.path.exists(filepath):
-            return "" # ファイルがない場合は何もしない
+            # デバッグ用にファイルがないことを表示（本番では消してもOK）
+            # st.error(f"音声ファイルが見つかりません: {filename}")
+            return "" 
         
         # ファイルを読み込んでBase64エンコード
-        with open(filepath, "rb") as f:
-            audio_bytes = f.read()
-        audio_base64 = base64.b64encode(audio_bytes).decode()
+        try:
+            with open(filepath, "rb") as f:
+                audio_bytes = f.read()
+            audio_base64 = base64.b64encode(audio_bytes).decode()
+        except Exception as e:
+            return ""
         
         # HTMLタグ生成
         loop_attr = "loop" if loop else ""
@@ -652,7 +659,14 @@ def show_sorting_game():
                 <script>
                     var audio = document.getElementById("audio_{rnd_id}");
                     audio.volume = {volume};
-                    audio.play().catch(e => console.log("Audio play blocked"));
+                    var promise = audio.play();
+                    if (promise !== undefined) {{
+                        promise.then(_ => {{
+                            // Autoplay started!
+                        }}).catch(error => {{
+                            console.log("Audio play blocked");
+                        }});
+                    }}
                 </script>
             </div>
         """
@@ -671,7 +685,6 @@ def show_sorting_game():
         logs = load_logs()
         today_str = datetime.date.today().isoformat()
         
-        # 今回の記録を作成
         new_record = {
             "name": name,
             "school": school,
@@ -696,10 +709,8 @@ def show_sorting_game():
             if mode == "daily" and record["date"] != today_str:
                 continue
             
-            # 学校名と名前で個人を特定
             key = f"{record['school']}_{record['name']}"
             
-            # 自己ベストのみ抽出
             if key not in best_records:
                 best_records[key] = record
             else:
@@ -817,7 +828,6 @@ def show_sorting_game():
     </div>
     """, unsafe_allow_html=True)
 
-
     # --- 3. ゲーム進行 ---
     
     # ■ スタート画面
@@ -857,7 +867,7 @@ def show_sorting_game():
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
         
-        # BGM再生 (ローカルファイル)
+        # BGM再生 (ファイル名が bgm.mp3 であることを前提)
         st.markdown(get_audio_html("bgm.mp3", loop=True, volume=0.2), unsafe_allow_html=True)
 
         q_idx = st.session_state.q_index
@@ -937,7 +947,7 @@ def show_sorting_game():
             if st.session_state.q_index + 1 >= len(st.session_state.current_questions):
                 st.session_state.final_time = round(time.time() - st.session_state.start_time + st.session_state.penalty_time, 2)
                 
-                # ★自動保存★
+                # 自動保存
                 name, school = get_user_info()
                 save_log(name, school, st.session_state.final_time)
                 
@@ -946,7 +956,6 @@ def show_sorting_game():
                 st.session_state.q_index += 1
                 
             st.rerun()
-
 
     # ■ クリア画面
     elif st.session_state.game_state == 'FINISHED':
