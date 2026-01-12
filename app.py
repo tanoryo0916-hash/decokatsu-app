@@ -618,14 +618,44 @@ import time
 import random
 import json
 import os
+import base64 # 音声変換用に追加
 import datetime
 import streamlit as st
 
-# --- 🎮 激闘！分別マスター（保存機能・UI安定化版） ---
+# --- 🎮 激闘！分別マスター（完全版：ローカル音声＆自動保存） ---
 def show_sorting_game():
     
-    # 📁 保存用ファイル名
+    # 📁 設定
     DATA_FILE = "ranking_log.json"
+    SOUND_DIR = "sounds" # 音声ファイルを入れるフォルダ名
+
+    # --- 🛠️ 音声再生関数（ローカルファイル読込版） ---
+    def get_audio_html(filename, loop=False, volume=0.5):
+        filepath = os.path.join(SOUND_DIR, filename)
+        if not os.path.exists(filepath):
+            return "" # ファイルがない場合は何もしない
+        
+        # ファイルを読み込んでBase64エンコード
+        with open(filepath, "rb") as f:
+            audio_bytes = f.read()
+        audio_base64 = base64.b64encode(audio_bytes).decode()
+        
+        # HTMLタグ生成
+        loop_attr = "loop" if loop else ""
+        rnd_id = random.randint(0, 100000) # キャッシュ回避用ID
+        
+        return f"""
+            <div style="display:none;">
+                <audio autoplay="{str(True).lower()}" {loop_attr} id="audio_{rnd_id}">
+                    <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                </audio>
+                <script>
+                    var audio = document.getElementById("audio_{rnd_id}");
+                    audio.volume = {volume};
+                    audio.play().catch(e => console.log("Audio play blocked"));
+                </script>
+            </div>
+        """
 
     # --- 🛠️ データ保存・読込関数 ---
     def load_logs():
@@ -639,8 +669,9 @@ def show_sorting_game():
 
     def save_log(name, school, score_time):
         logs = load_logs()
-        # 日付を追加して保存
         today_str = datetime.date.today().isoformat()
+        
+        # 今回の記録を作成
         new_record = {
             "name": name,
             "school": school,
@@ -648,33 +679,33 @@ def show_sorting_game():
             "date": today_str
         }
         logs.append(new_record)
+        
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
 
-    # --- 🛠️ ランキング集計関数（重複なし・最速抽出） ---
+    # --- 🛠️ ランキング集計関数 ---
     def get_rankings(mode="all"):
         logs = load_logs()
         if not logs:
             return []
         
         today_str = datetime.date.today().isoformat()
-        best_records = {} # キー: "学校名_名前", 値: レコード
+        best_records = {} 
 
         for record in logs:
-            # 今日のランキングの場合は日付でフィルタ
             if mode == "daily" and record["date"] != today_str:
                 continue
-
+            
+            # 学校名と名前で個人を特定
             key = f"{record['school']}_{record['name']}"
             
-            # まだ記録がない、または今回のほうが速ければ更新
+            # 自己ベストのみ抽出
             if key not in best_records:
                 best_records[key] = record
             else:
                 if record["time"] < best_records[key]["time"]:
                     best_records[key] = record
         
-        # リストにしてタイム順にソート
         ranking_list = list(best_records.values())
         ranking_list.sort(key=lambda x: x["time"])
         return ranking_list
@@ -686,7 +717,7 @@ def show_sorting_game():
         school = info.get('school', '体験入学校')
         return name, school
 
-    # --- 🛠️ 自己ベスト取得（歴代） ---
+    # --- 🛠️ 自己ベスト取得 ---
     def get_personal_best():
         name, school = get_user_info()
         all_ranks = get_rankings(mode="all")
@@ -694,30 +725,6 @@ def show_sorting_game():
             if r['name'] == name and r['school'] == school:
                 return r['time']
         return None
-
-    # --- 🔊 音声再生 ---
-    def play_sound_html(sound_url):
-        rnd = random.randint(0, 100000)
-        st.markdown(f"""
-            <div style="display:none;">
-                <audio autoplay="true">
-                    <source src="{sound_url}" type="audio/ogg">
-                    <source src="{sound_url}" type="audio/mp3">
-                </audio>
-                <script>
-                    var audio_{rnd} = new Audio("{sound_url}");
-                    audio_{rnd}.volume = 0.5;
-                    audio_{rnd}.play();
-                </script>
-            </div>
-        """, unsafe_allow_html=True)
-
-    SOUNDS = {
-        "bgm": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Nola_-_Kevin_MacLeod.ogg",
-        "correct": "https://upload.wikimedia.org/wikipedia/commons/3/34/Sound_Effect_-_Positive_Feedback.ogg",
-        "wrong": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Vibraphon_the_end.ogg",
-        "clear": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Music-14574.mp3"
-    }
 
     # --- 🎨 デザインCSS ---
     st.markdown("""
@@ -730,7 +737,7 @@ def show_sorting_game():
             text-align:center; padding:20px; background-color:#FFFFFF; 
             border-radius:15px; margin:20px 0; border:4px solid #607D8B;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            min-height: 120px; /* 高さ固定でガタつき防止 */
+            min-height: 120px;
             display: flex; align-items: center; justify-content: center;
         }
         .feedback-overlay {
@@ -754,19 +761,18 @@ def show_sorting_game():
 
     # --- 1. データ定義 ---
     garbage_data = [
-        # 🔥 燃えるゴミ
         {"name": "🍌 バナナの皮", "type": 0}, {"name": "🤧 使ったティッシュ", "type": 0},
         {"name": "🥢 汚れた割り箸", "type": 0}, {"name": "🧸 古いぬいぐるみ", "type": 0},
         {"name": "🍂 落ち葉", "type": 0}, {"name": "👕 汚れたTシャツ", "type": 0},
         {"name": "🧾 レシート", "type": 0}, {"name": "🐟 魚の骨", "type": 0},
         {"name": "😷 使い捨てマスク", "type": 0}, {"name": "🥚 卵の殻", "type": 0},
-        # ♻️ 資源ゴミ
+        
         {"name": "🥤 ペットボトル", "type": 1}, {"name": "🥫 空き缶", "type": 1},
         {"name": "🍾 空き瓶", "type": 1}, {"name": "📰 新聞紙", "type": 1},
         {"name": "📦 ダンボール", "type": 1}, {"name": "🥛 牛乳パック(洗)", "type": 1},
         {"name": "📚 雑誌", "type": 1}, {"name": "📃 チラシ", "type": 1},
         {"name": "🍫 お菓子の箱", "type": 1}, {"name": "📓 ノート", "type": 1},
-        # 🧱 埋立ゴミ
+        
         {"name": "🍵 割れた茶碗", "type": 2}, {"name": "🥛 割れたコップ", "type": 2},
         {"name": "🧤 ゴム手袋", "type": 2}, {"name": "☂️ 壊れた傘", "type": 2},
         {"name": "🧊 保冷剤", "type": 2}, {"name": "📼 ビデオテープ", "type": 2},
@@ -790,7 +796,7 @@ def show_sorting_game():
     if 'feedback_result' not in st.session_state:
         st.session_state.feedback_result = None
 
-    # ヘッダー表示
+    # ヘッダー
     st.markdown("""
     <div class="game-header">
         <div style="font-size:22px; font-weight:bold; color:#E65100;">
@@ -818,7 +824,7 @@ def show_sorting_game():
     if st.session_state.game_state == 'READY':
         col1, col2 = st.columns([2, 1])
         with col1:
-            st.info("👇 **スタート** を押してゲーム開始！(音が出ます)")
+            st.info("👇 **スタート** を押してゲーム開始！")
         with col2:
             if st.button("🏁 スタート！", use_container_width=True, type="primary"):
                 st.session_state.current_questions = random.sample(garbage_data, 10)
@@ -829,7 +835,6 @@ def show_sorting_game():
                 st.session_state.game_state = 'PLAYING'
                 st.rerun()
 
-        # ランキング表示（タブ切り替え）
         st.write("")
         tab1, tab2 = st.tabs(["📅 今日のランキング", "🏆 歴代ランキング"])
         
@@ -852,32 +857,20 @@ def show_sorting_game():
     # ■ プレイ画面
     elif st.session_state.game_state == 'PLAYING':
         
-        # BGM再生
-        st.markdown(f"""
-            <div style="display:none;">
-                <audio autoplay loop id="bgm">
-                    <source src="{SOUNDS['bgm']}" type="audio/ogg">
-                </audio>
-                <script>document.getElementById("bgm").volume = 0.2;</script>
-            </div>
-        """, unsafe_allow_html=True)
+        # BGM再生 (ローカルファイル)
+        st.markdown(get_audio_html("bgm.mp3", loop=True, volume=0.2), unsafe_allow_html=True)
 
-        # 現在の問題情報を取得
         q_idx = st.session_state.q_index
         total_q = len(st.session_state.current_questions)
         
-        # 終了判定（インデックスオーバー防止）
         if q_idx >= total_q:
-            # ここには通常到達しないが念のため
             st.session_state.game_state = 'FINISHED'
             st.rerun()
 
         target_item = st.session_state.current_questions[q_idx]
 
-        # --- UI描画（常に表示） ---
         st.progress((q_idx / total_q), text=f"第 {q_idx + 1} 問 / 全 {total_q} 問")
 
-        # 問題ボックス（高さ固定CSS適用済み）
         st.markdown(f"""
         <div class="question-box">
             <div style="font-size:32px; font-weight:bold; color:#333;">
@@ -887,10 +880,8 @@ def show_sorting_game():
         """, unsafe_allow_html=True)
         st.caption("このゴミはどれ？ 👇")
 
-        # ボタン配置
         c1, c2, c3 = st.columns(3)
         
-        # ボタン処理用の関数
         def handle_answer(choice):
             correct = st.session_state.current_questions[q_idx]['type']
             if choice == correct:
@@ -900,9 +891,6 @@ def show_sorting_game():
                 st.session_state.penalty_time += 5
             st.session_state.feedback_mode = True
 
-        # ボタンの描画（feedback_mode中でも描画し続けることで位置ズレを防ぐ）
-        # ただし、feedback_mode中は押せないように disabled=True にする手もあるが、
-        # ここでは単純に描画し続けるだけにする
         disable_btn = st.session_state.feedback_mode
 
         with c1:
@@ -921,9 +909,8 @@ def show_sorting_game():
                 handle_answer(2)
                 st.rerun()
 
-        # --- オーバーレイ描画と進行制御 ---
+        # オーバーレイ表示と進行処理
         if st.session_state.feedback_mode:
-            # 判定結果オーバーレイを表示（上のUIにかぶさる）
             if st.session_state.feedback_result == 'correct':
                 st.markdown("""
                 <div class="feedback-overlay" style="border:5px solid #4CAF50; background-color:#E8F5E9;">
@@ -931,7 +918,7 @@ def show_sorting_game():
                     <h2 style="color:#2E7D32; margin:0;">せいかい！</h2>
                 </div>
                 """, unsafe_allow_html=True)
-                play_sound_html(SOUNDS['correct'])
+                st.markdown(get_audio_html("correct.mp3"), unsafe_allow_html=True)
             else:
                 st.markdown("""
                 <div class="feedback-overlay" style="border:5px solid #D32F2F; background-color:#FFEBEE;">
@@ -940,18 +927,20 @@ def show_sorting_game():
                     <p style="font-weight:bold; color:red; font-size:20px;">+5秒</p>
                 </div>
                 """, unsafe_allow_html=True)
-                play_sound_html(SOUNDS['wrong'])
+                st.markdown(get_audio_html("wrong.mp3"), unsafe_allow_html=True)
 
-            # 表示用ウェイト
             time.sleep(1)
-            
-            # 次の問題へ更新処理
-            st.session_state.start_time += 1.0 # タイム補正
+            st.session_state.start_time += 1.0 # 判定時間のタイム除外
             st.session_state.feedback_mode = False
             
-            # 全問終了チェック
+            # 最後の問題だった場合、ここで保存して終了
             if st.session_state.q_index + 1 >= len(st.session_state.current_questions):
                 st.session_state.final_time = round(time.time() - st.session_state.start_time + st.session_state.penalty_time, 2)
+                
+                # ★自動保存★
+                name, school = get_user_info()
+                save_log(name, school, st.session_state.final_time)
+                
                 st.session_state.game_state = 'FINISHED'
             else:
                 st.session_state.q_index += 1
@@ -961,7 +950,7 @@ def show_sorting_game():
 
     # ■ クリア画面
     elif st.session_state.game_state == 'FINISHED':
-        play_sound_html(SOUNDS['clear'])
+        st.markdown(get_audio_html("clear.mp3"), unsafe_allow_html=True)
         st.balloons()
         
         my_time = st.session_state.final_time
@@ -976,20 +965,16 @@ def show_sorting_game():
             <div style="color:red; font-size:14px; margin-bottom:15px;">
                 (ペナルティ +{st.session_state.penalty_time}秒 含む)
             </div>
-            <div style="background-color:#E3F2FD; padding:10px; border-radius:10px; color:#0D47A1;">
-                <strong>{school}</strong> の <strong>{name}</strong> さん
+            <div style="background-color:#E3F2FD; padding:10px; border-radius:10px; color:#0D47A1; margin-bottom:10px;">
+                <strong>{school}</strong> の <strong>{name}</strong> さん<br>
+                記録を保存しました！💾
             </div>
         </div>
         """, unsafe_allow_html=True)
         
         st.write("") 
 
-        if st.button("ランキングを登録して戻る", type="primary", use_container_width=True):
-            # ファイルへ保存
-            save_log(name, school, my_time)
-            
-            st.toast("記録を保存しました！", icon="💾")
-            time.sleep(1.5)
+        if st.button("もういちど遊ぶ", type="primary", use_container_width=True):
             st.session_state.game_state = 'READY'
             st.rerun()
             
