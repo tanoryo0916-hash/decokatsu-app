@@ -275,13 +275,8 @@ def student_app_main():
         if is_hero:
             st.markdown(f"""<div class="hero-card"><div class="hero-name">🏆 認定エコヒーロー</div><br>{user['name']} 殿<br><small>2026.6.5 認定</small></div>""", unsafe_allow_html=True)
 
-        # メーター
-        col1, col2 = st.columns(2)
-        col1.metric("今のCO2削減量", f"{user['total']} g")
-        goal = 500
-        if user['total'] < goal: col2.metric("目標まで", f"あと {goal - user['total']} g")
-        else: col2.success("目標達成！🎉")
-        st.progress(min(user['total']/1340, 1.0))
+       # --- 🌳 木の成長ビジュアル表示 ---
+        show_my_tree(user['total'])
 
         st.divider()
         show_game()
