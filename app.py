@@ -650,6 +650,8 @@ def main_selector():
         </div>
         """, unsafe_allow_html=True)
 
+show_global_dashboard()
+
         st.markdown("### 👇 参加する方を選んでね")
         
         col1, col2 = st.columns(2)
