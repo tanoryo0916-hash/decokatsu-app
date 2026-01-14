@@ -31,128 +31,11 @@ def init_connection():
 supabase = init_connection()
 
 # ==========================================
-#  統計・ランキング取得関数 (キャッシュ活用)
+#  1. 共通関数 & 統計ダッシュボード
 # ==========================================
-
-@st.cache_data(ttl=600) # 10分間キャッシュ（サーバー負荷軽減）
-def fetch_dashboard_stats():
-    if not supabase: return 0, 0, 0, pd.DataFrame()
-
-    # --- 1. エコヒーロー認定者数 (学生のみ) ---
-    # actions_str に "環境の日アンケート" が含まれる人数
-    # ※大量データ対策のため、必要な列だけ取得
-    res_hero = supabase.table("logs_student").select("user_id, actions_str").execute()
-    df_hero = pd.DataFrame(res_hero.data)
-    
-    hero_count = 0
-    if not df_hero.empty:
-        # 文字列判定でカウント
-        hero_count = df_hero[df_hero['actions_str'].str.contains("環境の日アンケート", na=False)]['user_id'].nunique()
-
-    # --- 2. デコ活参加者数 (学生 + JCメンバー) ---
-    # 学生のユニーク数
-    student_count = df_hero['user_id'].nunique() if not df_hero.empty else 0
-    
-    # JCメンバーのユニーク数
-    res_mem = supabase.table("logs_member").select("user_name").execute()
-    df_mem = pd.DataFrame(res_mem.data)
-    member_count = df_mem['user_name'].nunique() if not df_mem.empty else 0
-    
-    total_participants = student_count + member_count
-
-    # --- 3. CO2削減総量 (学生 + JCメンバー) ---
-    # 学生のポイント合計
-    res_stu_pt = supabase.table("logs_student").select("action_points").execute()
-    df_stu_pt = pd.DataFrame(res_stu_pt.data)
-    stu_total = df_stu_pt['action_points'].sum() if not df_stu_pt.empty else 0
-    
-    # JCメンバーのポイント合計
-    res_mem_pt = supabase.table("logs_member").select("points").execute()
-    df_mem_pt = pd.DataFrame(res_mem_pt.data)
-    mem_total = df_mem_pt['points'].sum() if not df_mem_pt.empty else 0
-    
-    total_co2 = stu_total + mem_total
-
-    # --- 4. ゲームランキング (Top 10) ---
-    res_game = supabase.table("game_scores").select("*").order("time", desc=False).limit(10).execute()
-    df_ranking = pd.DataFrame(res_game.data)
-
-    return hero_count, total_participants, total_co2, df_ranking
-
-# ==========================================
-#  1. 共通関数 & アセット
-# ==========================================
-
-def show_global_dashboard():
-    # データ取得
-    hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
-
-    st.markdown("### 📊 現在の達成状況")
-    
-    # --- 3つの指標を並べる ---
-    c1, c2, c3 = st.columns(3)
-    
-    with c1:
-        st.metric(
-            label="👑 エコヒーロー認定",
-            value=f"{hero_cnt:,} 人",
-            help="6/5の特別ミッションをクリアした人数"
-        )
-    with c2:
-        st.metric(
-            label="🤝 デコ活参加者数",
-            value=f"{part_cnt:,} 人",
-            help="アプリに参加している全人数"
-        )
-    with c3:
-        st.metric(
-            label="📉 CO2削減総量",
-            value=f"{co2_total:,} g",
-            delta="みんなの成果！",
-            help="全員の削減量の合計"
-        )
-
-    st.divider()
-
-    # --- ゲームランキング表示 ---
-    st.subheader("⏱️ 分別ゲーム 最速ランキング (Top 10)")
-    
-    if not df_rank.empty:
-        # HTMLでリッチなリストを作る
-        ranking_html = ""
-        for i, row in df_rank.iterrows():
-            rank = i + 1
-            icon = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}."
-            bg_color = "#FFF8E1" if rank == 1 else "#F5F5F5" if rank <= 3 else "#FFFFFF"
-            border = "2px solid #FFD54F" if rank == 1 else "1px solid #ddd"
-            
-            ranking_html += f"""
-            <div style="
-                background-color: {bg_color};
-                border: {border};
-                border-radius: 10px;
-                padding: 10px 15px;
-                margin-bottom: 8px;
-                display: flex;
-                align-items: center;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            ">
-                <div style="font-size: 24px; margin-right: 15px; width: 40px; text-align: center;">{icon}</div>
-                <div style="flex-grow: 1;">
-                    <div style="font-weight: bold; font-size: 16px;">{row['time']} 秒</div>
-                    <div style="font-size: 12px; color: #666;">{row['name']} ({row['school']})</div>
-                </div>
-                <div style="font-size: 12px; color: #999;">{row['date']}</div>
-            </div>
-            """
-        
-        st.markdown(ranking_html, unsafe_allow_html=True)
-    else:
-        st.info("まだランキングデータがありません。一番乗りを目指そう！")
 
 # 音声再生用
 def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
-    # (本番環境でファイルがない場合のエラー回避)
     if not os.path.exists(filename): return ""
     try:
         with open(filename, "rb") as f:
@@ -165,103 +48,102 @@ def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
     except:
         return ""
 
+# ダッシュボード用データ取得 (10分キャッシュ)
+@st.cache_data(ttl=600)
+def fetch_dashboard_stats():
+    if not supabase: return 0, 0, 0, pd.DataFrame()
+
+    # 1. エコヒーロー数
+    res_hero = supabase.table("logs_student").select("user_id, actions_str").execute()
+    df_hero = pd.DataFrame(res_hero.data)
+    hero_count = 0
+    student_count = 0
+    if not df_hero.empty:
+        hero_count = df_hero[df_hero['actions_str'].astype(str).str.contains("環境の日アンケート", na=False)]['user_id'].nunique()
+        student_count = df_hero['user_id'].nunique()
+
+    # 2. 参加者総数 (学生+JC)
+    res_mem = supabase.table("logs_member").select("user_name").execute()
+    df_mem = pd.DataFrame(res_mem.data)
+    member_count = df_mem['user_name'].nunique() if not df_mem.empty else 0
+    total_participants = student_count + member_count
+
+    # 3. CO2削減総量
+    res_stu_pt = supabase.table("logs_student").select("action_points").execute()
+    df_stu_pt = pd.DataFrame(res_stu_pt.data)
+    stu_total = df_stu_pt['action_points'].sum() if not df_stu_pt.empty else 0
+    
+    res_mem_pt = supabase.table("logs_member").select("points").execute()
+    df_mem_pt = pd.DataFrame(res_mem_pt.data)
+    mem_total = df_mem_pt['points'].sum() if not df_mem_pt.empty else 0
+    
+    total_co2 = stu_total + mem_total
+
+    # 4. ゲームランキング (Top 10)
+    res_game = supabase.table("game_scores").select("*").order("time", desc=False).limit(10).execute()
+    df_ranking = pd.DataFrame(res_game.data)
+
+    return hero_count, total_participants, total_co2, df_ranking
+
+# ダッシュボード表示
+def show_global_dashboard():
+    hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
+
+    st.markdown("### 📊 現在の達成状況")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("👑 エコヒーロー", f"{hero_cnt:,} 人")
+    c2.metric("🤝 全参加者数", f"{part_cnt:,} 人")
+    c3.metric("📉 CO2削減総量", f"{co2_total:,} g")
+
+    with st.expander("⏱️ 分別ゲーム 最速ランキング (Top 10)"):
+        if not df_rank.empty:
+            for i, row in df_rank.iterrows():
+                icon = "🥇" if i==0 else "🥈" if i==1 else "🥉" if i==2 else f"{i+1}."
+                st.markdown(f"**{icon} {row['time']}秒** : {row['name']} ({row['school']})")
+        else:
+            st.info("データがありません")
+
 # ==========================================
 #  2. 小学生用アプリ ロジック
 # ==========================================
 
 def student_app_main():
-    # --- CSS (キッズ用) ---
+    # CSS
     st.markdown("""
     <style>
         .stButton>button { width: 100%; height: 70px; font-size: 20px !important; border-radius: 35px; font-weight: 900; background: linear-gradient(135deg, #FF9800 0%, #FF5722 100%); color: white; border: none; box-shadow: 0 4px 10px rgba(255,87,34,0.4); }
         .hero-card { background: linear-gradient(135deg, #FFD54F, #FFECB3); border: 4px solid #FFA000; border-radius: 20px; padding: 25px; text-align: center; margin-bottom: 25px; color: #5D4037; }
         .hero-name { font-size: 28px; font-weight: 900; border-bottom: 3px dashed #5D4037; display: inline-block; margin: 10px 0; }
-        .metric-container { padding: 15px; background-color: #F1F8E9; border-radius: 15px; border: 2px solid #C5E1A5; text-align: center; margin-bottom: 10px; }
-        div[data-testid="stForm"] { background-color: #ffffff; padding: 20px; border-radius: 20px; border: 2px solid #FFF3E0; }
         .login-guide { background-color: #FFEBEE; border: 2px solid #FFCDD2; border-radius: 15px; padding: 15px; margin-bottom: 20px; color: #B71C1C; font-size: 14px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 🌳 木の成長ロジック（1000g完結バージョン） ---
+    # 木の成長ロジック (1000g版)
     def get_tree_stage(total_points):
-        # (アイコン, 名前, 次の形態までの残りポイント, 背景色)
-        if total_points == 0:
-            return "🟤", "まだ 土（つち）の中...", 50, "#EFEBE9"
-        elif total_points < 100:
-            return "🌱", "芽（め）がでた！", 100, "#E8F5E9"
-        elif total_points < 300:
-            return "🌿", "すこし 育ったよ", 300, "#C8E6C9"
-        elif total_points < 600:
-            return "🪴", "若木（わかぎ）", 600, "#A5D6A7"
-        elif total_points < 900:
-            return "🌳", "立派（りっぱ）な 木", 900, "#81C784"
-        elif total_points < 1000:
-            return "🍎", "実（み）が なった！", 1000, "#FFF9C4"
-        else:
-            # 1000g以上で最終形態
-            return "🌈", "伝説（でんせつ）の 巨木！", 99999, "#B3E5FC"
+        if total_points == 0: return "🟤", "まだ 土の中...", 50, "#EFEBE9"
+        elif total_points < 100: return "🌱", "芽がでた！", 100, "#E8F5E9"
+        elif total_points < 300: return "🌿", "すこし 育ったよ", 300, "#C8E6C9"
+        elif total_points < 600: return "🪴", "若木", 600, "#A5D6A7"
+        elif total_points < 900: return "🌳", "立派な 木", 900, "#81C784"
+        elif total_points < 1000: return "🍎", "実が なった！", 1000, "#FFF9C4"
+        else: return "🌈", "伝説の 巨木！", 99999, "#B3E5FC"
 
     def show_my_tree(total_points):
         icon, status_text, next_goal, bg_color = get_tree_stage(total_points)
-        
-        # 次のレベルまでの割合
-        if next_goal == 99999:
-            progress = 1.0
-            rest_msg = "コンプリート！！"
-        else:
-            progress = min(total_points / next_goal, 1.0)
-            rest_msg = f"つぎの 進化（しんか）まで あと {next_goal - total_points} g"
+        progress = 1.0 if next_goal == 99999 else min(total_points / next_goal, 1.0)
+        rest_msg = "コンプリート！！" if next_goal == 99999 else f"あと {next_goal - total_points} g で進化！"
 
         st.markdown(f"""
-        <div style="
-            background-color: {bg_color};
-            border: 4px solid #fff;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            border-radius: 20px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 20px;
-            position: relative;
-        ">
-            <div style="font-size: 14px; color: #555; font-weight:bold; margin-bottom:10px;">
-                現在の マイ・ツリー
-            </div>
-            <div style="
-                font-size: 100px; 
-                line-height: 1.2; 
-                filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));
-                animation: float 3s ease-in-out infinite;
-            ">
-                {icon}
-            </div>
-            <div style="
-                font-size: 24px; 
-                font-weight: 900; 
-                color: #2E7D32;
-                margin-top: 10px;
-            ">
-                {status_text}
-            </div>
-            <div style="font-size: 14px; color: #666; margin-top: 5px;">
-                (合計削減量: {total_points} g)
-            </div>
-            <div style="margin-top: 15px; background: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px;">
-                <div style="font-size: 12px; font-weight:bold; color: #555;">{rest_msg}</div>
-            </div>
+        <div style="background-color: {bg_color}; border: 4px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 100px; line-height: 1.2;">{icon}</div>
+            <div style="font-size: 24px; font-weight: 900; color: #2E7D32; margin-top: 10px;">{status_text}</div>
+            <div style="font-size: 14px; color: #666;">(合計: {total_points} g)</div>
+            <div style="margin-top: 10px; font-weight:bold; color:#555;">{rest_msg}</div>
         </div>
-        <style>
-        @keyframes float {{
-            0% {{ transform: translateY(0px); }}
-            50% {{ transform: translateY(-10px); }}
-            100% {{ transform: translateY(0px); }}
-        }}
-        </style>
         """, unsafe_allow_html=True)
-        
-        # プログレスバー（Streamlit標準）
         st.progress(progress)
 
-    # --- DB関数 (Student) ---
+    # DB関数
     def fetch_student_data(user_id):
         if not supabase: return user_id, "", 0, {}
         try:
@@ -277,7 +159,7 @@ def student_app_main():
         except: return user_id, "", 0, {}
 
     def save_student_log(user_id, nickname, target_date, actions, points, memo, q1="", q2="", q3=""):
-        if not supabase: return
+        if not supabase: return False
         try:
             school_name = user_id.split("_")[0]
             data = {
@@ -287,9 +169,11 @@ def student_app_main():
             }
             supabase.table("logs_student").insert(data).execute()
             return True
-        except: return False
+        except Exception as e:
+            st.error(f"Save Error: {e}")
+            return False
 
-    # --- ゲームロジック ---
+    # ゲームロジック
     def show_game():
         st.markdown("### ⏱️ 激闘！分別マスター")
         if 'game_state' not in st.session_state: st.session_state.game_state = 'READY'
@@ -300,7 +184,6 @@ def student_app_main():
             {"name": "🤧 ティッシュ", "type": 0}, {"name": "🥫 空き缶", "type": 1}
         ]
         cats = {0: "🔥 燃える", 1: "♻️ 資 源", 2: "🧱 埋 立"}
-        colors = {0: "primary", 1: "primary", 2: "secondary"}
 
         if st.session_state.game_state == 'READY':
             if st.button("🏁 ゲームスタート！"):
@@ -309,21 +192,10 @@ def student_app_main():
                 st.session_state.g_start = time.time()
                 st.session_state.game_state = 'PLAYING'
                 st.rerun()
-            
-            # ランキング表示（簡易）
-            try:
-                ranks = supabase.table("game_scores").select("*").order("time", desc=False).limit(5).execute()
-                if ranks.data:
-                    st.caption("🏆 今日のランキング")
-                    for i, r in enumerate(ranks.data):
-                        st.text(f"{i+1}位: {r['time']}秒 ({r['name']} / {r['school']})")
-            except: pass
-
         elif st.session_state.game_state == 'PLAYING':
             q_idx = st.session_state.g_idx
             if q_idx >= len(st.session_state.game_qs):
                 final_time = round(time.time() - st.session_state.g_start, 2)
-                # 保存
                 u = st.session_state.student_user
                 try:
                     supabase.table("game_scores").insert({
@@ -339,10 +211,8 @@ def student_app_main():
             st.info(f"第{q_idx+1}問: {item['name']}")
             c1, c2, c3 = st.columns(3)
             def ans(c):
-                if c == item['type']: pass # 正解
-                else: st.session_state.g_start -= 2 # ペナルティなしで簡易化、あるいは時間を戻す？今回はシンプルにスルー
+                if c != item['type']: pass # ペナルティなし
                 st.session_state.g_idx += 1
-            
             with c1: 
                 if st.button(cats[0], key=f"g{q_idx}0"): ans(0); st.rerun()
             with c2: 
@@ -387,12 +257,12 @@ def student_app_main():
         user = st.session_state.student_user
         st.markdown(f"### 👋 こんにちは、{user['name']} さん！")
         
-        # 認定証チェック
+        # 認定証
         is_hero = any("環境の日アンケート" in acts for acts in user['history'].values())
         if is_hero:
             st.markdown(f"""<div class="hero-card"><div class="hero-name">🏆 認定エコヒーロー</div><br>{user['name']} 殿<br><small>2026.6.5 認定</small></div>""", unsafe_allow_html=True)
 
-       # --- 🌳 木の成長ビジュアル表示 ---
+        # 木の成長表示 (ここを差し替えました)
         show_my_tree(user['total'])
 
         st.divider()
@@ -410,7 +280,6 @@ def student_app_main():
             "家族": {"label": "⑤ 👨‍👩‍👧 家族も一緒にできた", "pt": 50}
         }
         
-        # データエディタ用作成
         df_data = {d: [False]*len(actions) for d in dates}
         for d in dates:
             if d in user['history']:
@@ -418,52 +287,36 @@ def student_app_main():
                     if k in user['history'][d]: df_data[d][i] = True
         
         df = pd.DataFrame(df_data, index=[v['label'] for v in actions.values()])
-        
         edited = st.data_editor(df, column_config={d: st.column_config.CheckboxColumn(d) for d in dates}, use_container_width=True)
 
-      # --- 修正版：保存ボタンのロジック ---
+        # ★ 保存ボタン (修正版)
         if st.button("✅ 記録を保存する", type="primary"):
             saved_cnt = 0
             new_pt = 0
             curr_hist = user['history'].copy()
-            
-            # エラーの詳細を見るためのプレースホルダー
             error_slot = st.empty()
 
             for d in dates:
                 acts_to_save = []
                 pt_day = 0
-                
-                # チェック状況を確認
                 for idx, (label, val) in enumerate(edited[d].items()):
                     if val:
                         key = list(actions.keys())[idx]
                         acts_to_save.append(key)
                         pt_day += actions[key]['pt']
                 
-                # 変更があるか確認（差分チェック）
                 prev_acts = curr_hist.get(d, [])
-                
-                # 「セット（集合）」で比較することで、順序が違っても中身が同じなら変更なしとみなす
                 if set(acts_to_save) != set(prev_acts):
                     prev_pt = sum([actions[k]['pt'] for k in prev_acts if k in actions])
                     diff = pt_day - prev_pt
                     
-                    # 保存処理を実行
-                    try:
-                        # save_student_log 関数を呼び出し
-                        result = save_student_log(user['id'], user['name'], d, acts_to_save, diff, "一括")
-                        
-                        if result:
-                            new_pt += diff
-                            curr_hist[d] = acts_to_save
-                            saved_cnt += 1
-                        else:
-                            error_slot.error(f"{d} の保存に失敗しました。データベースを確認してください。")
-                    except Exception as e:
-                        error_slot.error(f"エラー発生: {e}")
+                    if save_student_log(user['id'], user['name'], d, acts_to_save, diff, "一括"):
+                        new_pt += diff
+                        curr_hist[d] = acts_to_save
+                        saved_cnt += 1
+                    else:
+                        error_slot.error(f"保存失敗: {d}")
             
-            # 結果の表示
             if saved_cnt > 0:
                 st.session_state.student_user['total'] += new_pt
                 st.session_state.student_user['history'] = curr_hist
@@ -472,20 +325,18 @@ def student_app_main():
                 time.sleep(2)
                 st.rerun()
             else:
-                # 変更がなかった場合もメッセージを出すように修正
-                st.info("変更がなかったので、保存しませんでした。（チェックを変えてから押してね！）")
+                st.info("変更がありませんでした。")
 
-        # 6/5, 6/6 特別ミッション (簡易実装)
+        # 6/5, 6/6 特別ミッション
         with st.expander("🌿 6/5 環境の日・6/6 未来宣言"):
             st.info("6/5(金)になったらここに入力してね！")
             q1 = st.radio("チャレンジどうだった？", ["最高！", "普通", "まだまだ"], key="q1")
             memo = st.text_input("感想を一言", key="memo")
             if st.button("送信して認定証ゲット"):
-                # 実際は日付判定などを入れる
-                save_student_log(user['id'], user['name'], "6/5(金)", ["環境の日アンケート"], 100, memo, q1=q1)
-                st.success("送信しました！")
-                st.session_state.student_user['history']["6/5(金)"] = ["環境の日アンケート"]
-                st.rerun()
+                if save_student_log(user['id'], user['name'], "6/5(金)", ["環境の日アンケート"], 100, memo, q1=q1):
+                    st.success("送信しました！")
+                    st.session_state.student_user['history']["6/5(金)"] = ["環境の日アンケート"]
+                    st.rerun()
 
         if st.button("ログアウト"):
             del st.session_state.student_user
@@ -497,7 +348,7 @@ def student_app_main():
 # ==========================================
 
 def member_app_main():
-    # --- CSS (大人用・ダークモード対策済み) ---
+    # CSS
     st.markdown("""
     <style>
         .stButton>button { width: 100%; height: 60px; font-weight: bold; border-radius: 10px; background-color: #0277BD; color: white; }
@@ -519,7 +370,6 @@ def member_app_main():
     LOM_LIST = ["岡山", "倉敷", "津山", "玉野", "児島", "笠岡", "美作", "新見", "備前", "高梁", "総社", "井原", "真庭", "勝央", "瀬戸内"]
     TARGET_DATES = ["6/1(月)", "6/2(火)", "6/3(水)", "6/4(木)", "6/5(金)"]
 
-    # --- DB関数 (Member) ---
     def fetch_member_logs(user_name, lom_name):
         if not supabase: return pd.DataFrame()
         try:
@@ -552,13 +402,11 @@ def member_app_main():
                         "is_done": True, "points": pt
                     })
         try:
-            # 期間中のデータを削除して再登録(簡易Upsert)
             supabase.table("logs_member").delete().eq("user_name", user_name).eq("lom_name", lom_name).in_("target_date", TARGET_DATES).execute()
             if insert_list: supabase.table("logs_member").insert(insert_list).execute()
             return True
         except: return False
 
-    # --- 画面遷移管理 ---
     if "jc_user" not in st.session_state:
         st.title("👔 JCメンバー デコ活")
         st.info("所属LOMと氏名を入力してください")
@@ -570,7 +418,6 @@ def member_app_main():
                     st.session_state.jc_user = {"lom": lom, "name": name}
                     st.rerun()
                 else: st.warning("氏名を入力してください")
-        
         if st.button("⬅️ TOPに戻る"):
             st.session_state.app_mode = 'select'
             st.rerun()
@@ -578,17 +425,14 @@ def member_app_main():
         user = st.session_state.jc_user
         st.markdown(f"**👤 {user['lom']}JC {user['name']} 君**")
         
-        # ポイント表示
         logs = fetch_member_logs(user['name'], user['lom'])
         total = logs['points'].sum() if not logs.empty else 0
         st.markdown(f"""<div class="metric-box"><div style="font-size:14px;">現在の獲得ポイント</div><div style="font-size:32px; font-weight:bold; color:#0277BD;">{total:,} <span style="font-size:16px;">g-CO2</span></div></div>""", unsafe_allow_html=True)
 
-        # チェックシート
         st.subheader("📝 実践チェック")
         disp_items = [v["label"] for v in ACTION_MASTER.values()]
         df_data = {"アクション項目": disp_items}
         
-        # 過去データの復元
         for d in TARGET_DATES:
             checks = []
             for item in disp_items:
@@ -601,9 +445,7 @@ def member_app_main():
                 checks.append(is_done)
             df_data[d] = checks
         
-        edited = st.data_editor(pd.DataFrame(df_data), column_config={
-            d: st.column_config.CheckboxColumn(d, default=False) for d in TARGET_DATES
-        }, use_container_width=True, hide_index=True)
+        edited = st.data_editor(pd.DataFrame(df_data), column_config={d: st.column_config.CheckboxColumn(d, default=False) for d in TARGET_DATES}, use_container_width=True, hide_index=True)
 
         if st.button("記録を保存する", type="primary"):
             if save_member_logs(user['name'], user['lom'], edited):
@@ -612,7 +454,6 @@ def member_app_main():
                 time.sleep(1)
                 st.rerun()
 
-        # ランキング
         st.markdown("---")
         st.subheader("🏆 LOM対抗ランキング")
         ranks = fetch_lom_ranking()
@@ -623,15 +464,12 @@ def member_app_main():
             
             for i, r in ranks.head(5).iterrows():
                 rk = i + 1
-                icon = "🥇" if rk==1 else "🥈" if rk==2 else "🥉" if rk==3 else f"{rk}位"
                 cls = "rank-1" if rk==1 else ""
-                st.markdown(f"""<div class="lom-ranking {cls}"><span style="font-size:20px;">{icon}</span> <strong>{r['lom_name']}JC</strong> <span style="float:right; font-weight:bold; color:#0277BD;">{r['points']:,} pt</span></div>""", unsafe_allow_html=True)
-        else: st.caption("データ収集中...")
+                st.markdown(f"""<div class="lom-ranking {cls}"><strong>{rk}位 {r['lom_name']}JC</strong> <span style="float:right; font-weight:bold; color:#0277BD;">{r['points']:,} pt</span></div>""", unsafe_allow_html=True)
 
         if st.button("ログアウト"):
             del st.session_state.jc_user
             st.rerun()
-
 
 # ==========================================
 #  4. メイン実行ブロック（入り口）
@@ -642,7 +480,6 @@ def main_selector():
         st.session_state.app_mode = 'select'
 
     if st.session_state.app_mode == 'select':
-        # ヘッダー画像風デザイン
         st.markdown("""
         <div style="background:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1501854140801-50d01698950b'); background-size:cover; padding:60px 20px; border-radius:20px; text-align:center; color:white; margin-bottom:30px;">
             <h1 style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🍑 おかやまデコ活チャレンジ</h1>
@@ -650,8 +487,10 @@ def main_selector():
         </div>
         """, unsafe_allow_html=True)
 
-show_global_dashboard()
-
+        # ★ 統計ダッシュボードを表示
+        show_global_dashboard()
+        
+        st.markdown("---")
         st.markdown("### 👇 参加する方を選んでね")
         
         col1, col2 = st.columns(2)
@@ -664,18 +503,6 @@ show_global_dashboard()
             if st.button("👔 JCメンバー\n(LOM対抗戦)"):
                 st.session_state.app_mode = 'member'
                 st.rerun()
-                
-        st.markdown("---")
-        # 全体統計
-        if supabase:
-            try:
-                res = supabase.table("logs_student").select("action_points").execute()
-                total_k = pd.DataFrame(res.data)['action_points'].sum() if res.data else 0
-                res2 = supabase.table("logs_member").select("points").execute()
-                total_m = pd.DataFrame(res2.data)['points'].sum() if res2.data else 0
-                
-                st.metric("🍑 オール岡山の総削減量", f"{total_k + total_m:,} g-CO2")
-            except: pass
 
     elif st.session_state.app_mode == 'student':
         student_app_main()
