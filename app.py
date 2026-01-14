@@ -157,11 +157,14 @@ def show_global_stage_visual(total_g):
     
     st.progress(progress)
 
-# ダッシュボード表示
+# ダッシュボード表示（修正版）
 def show_global_dashboard():
     hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
 
-    st.markdown("### 📊 現在の達成状況")
+    # ★ ここに追加：全体の成長ビジュアル ★
+    show_global_stage_visual(co2_total)
+
+    st.markdown("### 📊 詳細データ")
     c1, c2, c3 = st.columns(3)
     c1.metric("👑 エコヒーロー", f"{hero_cnt:,} 人")
     c2.metric("🤝 全参加者数", f"{part_cnt:,} 人")
