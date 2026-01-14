@@ -85,6 +85,78 @@ def fetch_dashboard_stats():
 
     return hero_count, total_participants, total_co2, df_ranking
 
+# --- 🌍 全体の成長ステージロジック ---
+def get_global_stage(total_g):
+    # 単位換算（見やすくするため）
+    total_kg = total_g / 1000
+    total_t = total_kg / 1000
+
+    # ステージ分岐 (目標設定: 9万人が500g削減 = 45トンと想定)
+    if total_g < 100000: # 100kg未満
+        return "🌱", "希望の芽生え", "まずは 100kg を目指そう！", "#E0F7FA", 100000
+    elif total_g < 1000000: # 1トン未満
+        return "🌳", "地域のシンボルツリー", "つぎは 1トン（1,000kg）だ！", "#C8E6C9", 1000000
+    elif total_g < 5000000: # 5トン未満
+        return "🌲", "深まる緑の森", "目指せ 5トン！森を広げよう", "#81C784", 5000000
+    elif total_g < 10000000: # 10トン未満
+        return "⛰️", "雄大なグリーンマウンテン", "つぎは 10トン！山を作ろう", "#4DB6AC", 10000000
+    elif total_g < 30000000: # 30トン未満
+        return "🌏", "美しい地球", "奇跡の 30トンを目指して！", "#4FC3F7", 30000000
+    else:
+        return "🪐", "銀河一のエコ地域", "伝説達成！みんなありがとう！", "#B39DDB", 99999999
+
+def show_global_stage_visual(total_g):
+    icon, title, msg, bg, next_val = get_global_stage(total_g)
+    
+    # プログレス計算
+    progress = 1.0 if next_val == 99999999 else min(total_g / next_val, 1.0)
+    
+    # 表示用数値の整形（g, kg, t）
+    if total_g < 1000: disp_val = f"{total_g:,} g"
+    elif total_g < 1000000: disp_val = f"{total_g/1000:.1f} kg"
+    else: disp_val = f"{total_g/1000000:.2f} t"
+
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, {bg}, #ffffff);
+        border: 4px solid {bg};
+        border-radius: 20px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    ">
+        <div style="font-size: 14px; font-weight:bold; color:#546E7A; margin-bottom:5px;">
+            現在の オール岡山ステージ
+        </div>
+        <div style="
+            font-size: 80px; 
+            animation: pulse 2s infinite;
+            margin: 10px 0;
+        ">
+            {icon}
+        </div>
+        <div style="font-size: 24px; font-weight: 900; color: #37474F;">
+            {title}
+        </div>
+        <div style="font-size: 32px; font-weight: 900; color: #00897B; margin: 5px 0;">
+            {disp_val} <span style="font-size:16px; color:#555;">削減中！</span>
+        </div>
+        <div style="background:rgba(255,255,255,0.6); padding:5px 15px; border-radius:20px; display:inline-block; font-weight:bold; color:#455A64;">
+            🚀 {msg}
+        </div>
+    </div>
+    <style>
+    @keyframes pulse {{
+        0% {{ transform: scale(1); }}
+        50% {{ transform: scale(1.1); }}
+        100% {{ transform: scale(1); }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.progress(progress)
+
 # ダッシュボード表示
 def show_global_dashboard():
     hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
