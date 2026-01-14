@@ -66,6 +66,84 @@ def student_app_main():
     </style>
     """, unsafe_allow_html=True)
 
+# --- 🌳 木の成長ロジック ---
+    def get_tree_stage(total_points):
+        # (アイコン, 名前, 次の形態までの残りポイント, 背景色)
+        if total_points == 0:
+            return "🟤", "まだ 土（つち）の中...", 50, "#EFEBE9"
+        elif total_points < 100:
+            return "🌱", "芽（め）がでた！", 100, "#E8F5E9"
+        elif total_points < 300:
+            return "🌿", "すこし 育ったよ", 300, "#C8E6C9"
+        elif total_points < 600:
+            return "🪴", "若木（わかぎ）", 600, "#A5D6A7"
+        elif total_points < 1000:
+            return "🌳", "立派（りっぱ）な 木", 1000, "#81C784"
+        elif total_points < 1500:
+            return "🍎", "実（み）が なった！", 1500, "#FFF9C4"
+        else:
+            return "🏡", "森（もり）になった！", 99999, "#B2DFDB"
+
+    def show_my_tree(total_points):
+        icon, status_text, next_goal, bg_color = get_tree_stage(total_points)
+        
+        # 次のレベルまでの割合
+        if next_goal == 99999:
+            progress = 1.0
+            rest_msg = "コンプリート！！"
+        else:
+            progress = min(total_points / next_goal, 1.0)
+            rest_msg = f"つぎの 進化（しんか）まで あと {next_goal - total_points} g"
+
+        st.markdown(f"""
+        <div style="
+            background-color: {bg_color};
+            border: 4px solid #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+        ">
+            <div style="font-size: 14px; color: #555; font-weight:bold; margin-bottom:10px;">
+                現在の マイ・ツリー
+            </div>
+            <div style="
+                font-size: 100px; 
+                line-height: 1.2; 
+                filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));
+                animation: float 3s ease-in-out infinite;
+            ">
+                {icon}
+            </div>
+            <div style="
+                font-size: 24px; 
+                font-weight: 900; 
+                color: #2E7D32;
+                margin-top: 10px;
+            ">
+                {status_text}
+            </div>
+            <div style="font-size: 14px; color: #666; margin-top: 5px;">
+                (合計削減量: {total_points} g)
+            </div>
+            <div style="margin-top: 15px; background: rgba(255,255,255,0.5); border-radius: 10px; padding: 5px;">
+                <div style="font-size: 12px; font-weight:bold; color: #555;">{rest_msg}</div>
+            </div>
+        </div>
+        <style>
+        @keyframes float {{
+            0% {{ transform: translateY(0px); }}
+            50% {{ transform: translateY(-10px); }}
+            100% {{ transform: translateY(0px); }}
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # プログレスバー（Streamlit標準）
+        st.progress(progress)
+
     # --- DB関数 (Student) ---
     def fetch_student_data(user_id):
         if not supabase: return user_id, "", 0, {}
