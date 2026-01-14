@@ -66,7 +66,7 @@ def student_app_main():
     </style>
     """, unsafe_allow_html=True)
 
-# --- 🌳 木の成長ロジック ---
+# --- 🌳 木の成長ロジック（1000g完結バージョン） ---
     def get_tree_stage(total_points):
         # (アイコン, 名前, 次の形態までの残りポイント, 背景色)
         if total_points == 0:
@@ -77,12 +77,13 @@ def student_app_main():
             return "🌿", "すこし 育ったよ", 300, "#C8E6C9"
         elif total_points < 600:
             return "🪴", "若木（わかぎ）", 600, "#A5D6A7"
+        elif total_points < 900:
+            return "🌳", "立派（りっぱ）な 木", 900, "#81C784"
         elif total_points < 1000:
-            return "🌳", "立派（りっぱ）な 木", 1000, "#81C784"
-        elif total_points < 1500:
-            return "🍎", "実（み）が なった！", 1500, "#FFF9C4"
+            return "🍎", "実（み）が なった！", 1000, "#FFF9C4"
         else:
-            return "🏡", "森（もり）になった！", 99999, "#B2DFDB"
+            # 1000g以上で最終形態
+            return "🌈", "伝説（でんせつ）の 巨木！", 99999, "#B3E5FC"
 
     def show_my_tree(total_points):
         icon, status_text, next_goal, bg_color = get_tree_stage(total_points)
