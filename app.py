@@ -231,14 +231,19 @@ def student_app_main():
         
         edited = st.data_editor(df, column_config={d: st.column_config.CheckboxColumn(d) for d in dates}, use_container_width=True)
 
-        if st.button("✅ 記録を保存する"):
+      # --- 修正版：保存ボタンのロジック ---
+        if st.button("✅ 記録を保存する", type="primary"):
             saved_cnt = 0
             new_pt = 0
             curr_hist = user['history'].copy()
             
+            # エラーの詳細を見るためのプレースホルダー
+            error_slot = st.empty()
+
             for d in dates:
                 acts_to_save = []
                 pt_day = 0
+                
                 # チェック状況を確認
                 for idx, (label, val) in enumerate(edited[d].items()):
                     if val:
@@ -246,16 +251,29 @@ def student_app_main():
                         acts_to_save.append(key)
                         pt_day += actions[key]['pt']
                 
-                # 変更があれば保存
+                # 変更があるか確認（差分チェック）
                 prev_acts = curr_hist.get(d, [])
+                
+                # 「セット（集合）」で比較することで、順序が違っても中身が同じなら変更なしとみなす
                 if set(acts_to_save) != set(prev_acts):
                     prev_pt = sum([actions[k]['pt'] for k in prev_acts if k in actions])
                     diff = pt_day - prev_pt
-                    if save_student_log(user['id'], user['name'], d, acts_to_save, diff, "一括"):
-                        new_pt += diff
-                        curr_hist[d] = acts_to_save
-                        saved_cnt += 1
+                    
+                    # 保存処理を実行
+                    try:
+                        # save_student_log 関数を呼び出し
+                        result = save_student_log(user['id'], user['name'], d, acts_to_save, diff, "一括")
+                        
+                        if result:
+                            new_pt += diff
+                            curr_hist[d] = acts_to_save
+                            saved_cnt += 1
+                        else:
+                            error_slot.error(f"{d} の保存に失敗しました。データベースを確認してください。")
+                    except Exception as e:
+                        error_slot.error(f"エラー発生: {e}")
             
+            # 結果の表示
             if saved_cnt > 0:
                 st.session_state.student_user['total'] += new_pt
                 st.session_state.student_user['history'] = curr_hist
@@ -263,6 +281,9 @@ def student_app_main():
                 st.success(f"保存しました！ ポイント変動: {new_pt}g")
                 time.sleep(2)
                 st.rerun()
+            else:
+                # 変更がなかった場合もメッセージを出すように修正
+                st.info("変更がなかったので、保存しませんでした。（チェックを変えてから押してね！）")
 
         # 6/5, 6/6 特別ミッション (簡易実装)
         with st.expander("🌿 6/5 環境の日・6/6 未来宣言"):
