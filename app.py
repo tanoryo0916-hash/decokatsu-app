@@ -83,6 +83,73 @@ def fetch_dashboard_stats():
 #  1. 共通関数 & アセット
 # ==========================================
 
+def show_global_dashboard():
+    # データ取得
+    hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
+
+    st.markdown("### 📊 現在の達成状況")
+    
+    # --- 3つの指標を並べる ---
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        st.metric(
+            label="👑 エコヒーロー認定",
+            value=f"{hero_cnt:,} 人",
+            help="6/5の特別ミッションをクリアした人数"
+        )
+    with c2:
+        st.metric(
+            label="🤝 デコ活参加者数",
+            value=f"{part_cnt:,} 人",
+            help="アプリに参加している全人数"
+        )
+    with c3:
+        st.metric(
+            label="📉 CO2削減総量",
+            value=f"{co2_total:,} g",
+            delta="みんなの成果！",
+            help="全員の削減量の合計"
+        )
+
+    st.divider()
+
+    # --- ゲームランキング表示 ---
+    st.subheader("⏱️ 分別ゲーム 最速ランキング (Top 10)")
+    
+    if not df_rank.empty:
+        # HTMLでリッチなリストを作る
+        ranking_html = ""
+        for i, row in df_rank.iterrows():
+            rank = i + 1
+            icon = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}."
+            bg_color = "#FFF8E1" if rank == 1 else "#F5F5F5" if rank <= 3 else "#FFFFFF"
+            border = "2px solid #FFD54F" if rank == 1 else "1px solid #ddd"
+            
+            ranking_html += f"""
+            <div style="
+                background-color: {bg_color};
+                border: {border};
+                border-radius: 10px;
+                padding: 10px 15px;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            ">
+                <div style="font-size: 24px; margin-right: 15px; width: 40px; text-align: center;">{icon}</div>
+                <div style="flex-grow: 1;">
+                    <div style="font-weight: bold; font-size: 16px;">{row['time']} 秒</div>
+                    <div style="font-size: 12px; color: #666;">{row['name']} ({row['school']})</div>
+                </div>
+                <div style="font-size: 12px; color: #999;">{row['date']}</div>
+            </div>
+            """
+        
+        st.markdown(ranking_html, unsafe_allow_html=True)
+    else:
+        st.info("まだランキングデータがありません。一番乗りを目指そう！")
+
 # 音声再生用
 def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
     # (本番環境でファイルがない場合のエラー回避)
