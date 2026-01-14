@@ -31,6 +31,55 @@ def init_connection():
 supabase = init_connection()
 
 # ==========================================
+#  統計・ランキング取得関数 (キャッシュ活用)
+# ==========================================
+
+@st.cache_data(ttl=600) # 10分間キャッシュ（サーバー負荷軽減）
+def fetch_dashboard_stats():
+    if not supabase: return 0, 0, 0, pd.DataFrame()
+
+    # --- 1. エコヒーロー認定者数 (学生のみ) ---
+    # actions_str に "環境の日アンケート" が含まれる人数
+    # ※大量データ対策のため、必要な列だけ取得
+    res_hero = supabase.table("logs_student").select("user_id, actions_str").execute()
+    df_hero = pd.DataFrame(res_hero.data)
+    
+    hero_count = 0
+    if not df_hero.empty:
+        # 文字列判定でカウント
+        hero_count = df_hero[df_hero['actions_str'].str.contains("環境の日アンケート", na=False)]['user_id'].nunique()
+
+    # --- 2. デコ活参加者数 (学生 + JCメンバー) ---
+    # 学生のユニーク数
+    student_count = df_hero['user_id'].nunique() if not df_hero.empty else 0
+    
+    # JCメンバーのユニーク数
+    res_mem = supabase.table("logs_member").select("user_name").execute()
+    df_mem = pd.DataFrame(res_mem.data)
+    member_count = df_mem['user_name'].nunique() if not df_mem.empty else 0
+    
+    total_participants = student_count + member_count
+
+    # --- 3. CO2削減総量 (学生 + JCメンバー) ---
+    # 学生のポイント合計
+    res_stu_pt = supabase.table("logs_student").select("action_points").execute()
+    df_stu_pt = pd.DataFrame(res_stu_pt.data)
+    stu_total = df_stu_pt['action_points'].sum() if not df_stu_pt.empty else 0
+    
+    # JCメンバーのポイント合計
+    res_mem_pt = supabase.table("logs_member").select("points").execute()
+    df_mem_pt = pd.DataFrame(res_mem_pt.data)
+    mem_total = df_mem_pt['points'].sum() if not df_mem_pt.empty else 0
+    
+    total_co2 = stu_total + mem_total
+
+    # --- 4. ゲームランキング (Top 10) ---
+    res_game = supabase.table("game_scores").select("*").order("time", desc=False).limit(10).execute()
+    df_ranking = pd.DataFrame(res_game.data)
+
+    return hero_count, total_participants, total_co2, df_ranking
+
+# ==========================================
 #  1. 共通関数 & アセット
 # ==========================================
 
