@@ -295,11 +295,16 @@ def student_app_main():
                         saved_pin = pin
 
                     if can_login:
+                        # Cookieをセット
                         cookie_manager.set("decokatsu_user_id", uid, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+                        
+                        # ★ ここに追加：書き込み完了まで少し待つ
+                        time.sleep(1)
+
                         st.session_state.student_user = {
                             "id": uid, 
                             "school": f"{school}小学校", 
-                            "grade_class": f"{grade} {u_class}組 {num}番", # ここがランキングに使われる
+                            "grade_class": f"{grade} {u_class}組 {num}番", 
                             "total": total, "history": hist, "pin": saved_pin
                         }
                         st.rerun()
