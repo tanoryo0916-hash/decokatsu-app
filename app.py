@@ -33,7 +33,8 @@ supabase = init_connection()
 
 # --- Cookieマネージャー ---
 def get_manager():
-    return stx.CookieManager()
+    # keyを指定することで、リロードしてもコンポーネントの状態を維持させる
+    return stx.CookieManager(key="decokatsu_cookie_manager")
 
 cookie_manager = get_manager()
 
