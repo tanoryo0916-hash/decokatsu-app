@@ -184,21 +184,28 @@ def student_app_main():
         """, unsafe_allow_html=True)
         st.progress(progress)
 
-    # DB関数
+   # DB関数（pin_code対応版）
     def fetch_student_data(user_id):
-        if not supabase: return user_id, "", 0, {}
+        if not supabase: return user_id, "", "", 0, {} # pinも返す
         try:
             res = supabase.table("logs_student").select("*").eq("user_id", user_id).execute()
-            if not res.data: return user_id, "", 0, {}
+            if not res.data: return user_id, "", "", 0, {}
             df = pd.DataFrame(res.data)
+            
+            # 最新のデータから情報を取る
+            last_row = df.iloc[-1]
             total = df['action_points'].sum()
-            nickname = df['nickname'].iloc[-1] if 'nickname' in df.columns else ""
+            nickname = last_row['nickname'] if 'nickname' in df.columns else ""
+            
+            # ★ pin_code を取得（保存されていれば）
+            pin_code = last_row['pin_code'] if 'pin_code' in df.columns else ""
+            
             history = {}
             for _, row in df.iterrows():
                 if row['target_date']: history[row['target_date']] = str(row['actions_str']).split(", ")
-            return user_id, nickname, int(total), history
-        except: return user_id, "", 0, {}
-
+            
+            return user_id, nickname, pin_code, int(total), history
+        except: return user_id, "", "", 0, {}
    # ★ 修正版：上書き設定（on_conflict）を追加した保存関数
     def save_student_log(user_id, nickname, target_date, actions, points, memo, q1="", q2="", q3=""):
         if not supabase: return False
