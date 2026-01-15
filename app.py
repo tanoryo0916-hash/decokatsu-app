@@ -32,7 +32,7 @@ def init_connection():
 supabase = init_connection()
 
 # --- Cookieマネージャー (自動ログイン用) ---
-@st.cache_resource(experimental_allow_widgets=True)
+@st.cache_resource
 def get_manager():
     return stx.CookieManager()
 
