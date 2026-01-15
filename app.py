@@ -31,8 +31,7 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- Cookieマネージャー (自動ログイン用) ---
-# ※エラー回避のため @st.cache_resource は付けない
+# --- Cookieマネージャー ---
 def get_manager():
     return stx.CookieManager()
 
@@ -42,21 +41,7 @@ cookie_manager = get_manager()
 #  1. 共通関数 & 統計ダッシュボード
 # ==========================================
 
-# 音声再生用
-def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
-    if not os.path.exists(filename): return ""
-    try:
-        with open(filename, "rb") as f:
-            data = f.read()
-        b64 = base64.b64encode(data).decode()
-        mime_type = "audio/mpeg"
-        if element_id is None: element_id = f"audio_{random.randint(0, 1000000)}"
-        loop_attr = "loop" if loop else ""
-        return f"""<div style="width:0; height:0; overflow:hidden;"><audio id="{element_id}" {loop_attr} autoplay><source src="data:{mime_type};base64,{b64}" type="audio/mp3"></audio></div>"""
-    except:
-        return ""
-
-# 🌍 全体の成長ステージロジック（3万人目標版: 15トンゴール）
+# 🌍 全体の成長ステージ
 def get_global_stage(total_g):
     if total_g < 100000: return "🌱", "希望の芽生え", "まずは 100kg を目指そう！", "#E0F7FA", 100000
     elif total_g < 500000: return "🌳", "地域のシンボルツリー", "つぎは 500kg！大きな木に！", "#C8E6C9", 500000
@@ -69,7 +54,6 @@ def show_global_stage_visual(total_g):
     icon, title, msg, bg, next_val = get_global_stage(total_g)
     progress = 1.0 if next_val == 15000000 else min(total_g / next_val, 1.0)
     
-    # 単位調整
     if total_g < 1000: disp_val = f"{total_g:,} g"
     elif total_g < 1000000: disp_val = f"{total_g/1000:.1f} kg"
     else: disp_val = f"{total_g/1000000:.2f} t"
@@ -86,12 +70,11 @@ def show_global_stage_visual(total_g):
     """, unsafe_allow_html=True)
     st.progress(progress)
 
-# ダッシュボード用データ取得 (10分キャッシュ)
 @st.cache_data(ttl=600)
 def fetch_dashboard_stats():
     if not supabase: return 0, 0, 0, pd.DataFrame()
 
-    # 1. エコヒーロー数
+    # エコヒーロー数
     res_hero = supabase.table("logs_student").select("user_id, actions_str").execute()
     df_hero = pd.DataFrame(res_hero.data)
     hero_count = 0
@@ -100,13 +83,13 @@ def fetch_dashboard_stats():
         hero_count = df_hero[df_hero['actions_str'].astype(str).str.contains("環境の日アンケート", na=False)]['user_id'].nunique()
         student_count = df_hero['user_id'].nunique()
 
-    # 2. 参加者総数 (学生+JC)
+    # 参加者総数
     res_mem = supabase.table("logs_member").select("user_name").execute()
     df_mem = pd.DataFrame(res_mem.data)
     member_count = df_mem['user_name'].nunique() if not df_mem.empty else 0
     total_participants = student_count + member_count
 
-    # 3. CO2削減総量
+    # CO2削減総量
     res_stu_pt = supabase.table("logs_student").select("action_points").execute()
     df_stu_pt = pd.DataFrame(res_stu_pt.data)
     stu_total = df_stu_pt['action_points'].sum() if not df_stu_pt.empty else 0
@@ -117,16 +100,14 @@ def fetch_dashboard_stats():
     
     total_co2 = stu_total + mem_total
 
-    # 4. ゲームランキング (Top 10)
+    # ゲームランキング
     res_game = supabase.table("game_scores").select("*").order("time", desc=False).limit(10).execute()
     df_ranking = pd.DataFrame(res_game.data)
 
     return hero_count, total_participants, total_co2, df_ranking
 
-# ダッシュボード表示
 def show_global_dashboard():
     hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
-
     show_global_stage_visual(co2_total)
 
     st.markdown("### 📊 詳細データ")
@@ -135,20 +116,31 @@ def show_global_dashboard():
     c2.metric("🤝 全参加者数", f"{part_cnt:,} 人")
     c3.metric("📉 CO2削減総量", f"{co2_total:,} g")
 
-    with st.expander("⏱️ 分別ゲーム 最速ランキング (Top 10)"):
+    # ★ 修正：ランキングに組・番号を表示
+    with st.expander("⏱️ 分別ゲーム 最速ランキング (Top 10)", expanded=True):
         if not df_rank.empty:
+            html = ""
             for i, row in df_rank.iterrows():
-                icon = "🥇" if i==0 else "🥈" if i==1 else "🥉" if i==2 else f"{i+1}."
-                st.markdown(f"**{icon} {row['time']}秒** : {row['name']} ({row['school']})")
+                rank = i + 1
+                icon = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"{rank}."
+                # row['name'] には "1年 A組 10番" が入っている想定
+                html += f"""
+                <div style='margin-bottom:8px; padding:10px; background:#f9f9f9; border-radius:5px; border-left:4px solid #FF9800;'>
+                    <span style="font-size:20px; margin-right:10px;">{icon}</span>
+                    <span style="font-size:18px; font-weight:bold; color:#E65100;">{row['time']}秒</span>
+                    <br>
+                    <span style="font-size:14px; color:#555; margin-left:35px;">{row['school']} <strong>{row['name']}</strong></span>
+                </div>
+                """
+            st.markdown(html, unsafe_allow_html=True)
         else:
             st.info("データがありません")
 
 # ==========================================
-#  2. 小学生用アプリ ロジック
+#  2. 小学生用アプリ ロジック (名前なし・PINあり)
 # ==========================================
 
 def student_app_main():
-    # CSS
     st.markdown("""
     <style>
         .stButton>button { width: 100%; height: 70px; font-size: 20px !important; border-radius: 35px; font-weight: 900; background: linear-gradient(135deg, #FF9800 0%, #FF5722 100%); color: white; border: none; box-shadow: 0 4px 10px rgba(255,87,34,0.4); }
@@ -158,7 +150,6 @@ def student_app_main():
     </style>
     """, unsafe_allow_html=True)
 
-    # 🌳 木の成長ロジック (1000g完結版)
     def get_tree_stage(total_points):
         if total_points == 0: return "🟤", "まだ 土の中...", 50, "#EFEBE9"
         elif total_points < 100: return "🌱", "芽がでた！", 100, "#E8F5E9"
@@ -184,47 +175,43 @@ def student_app_main():
         """, unsafe_allow_html=True)
         st.progress(progress)
 
-   # DB関数（pin_code対応版）
     def fetch_student_data(user_id):
-        if not supabase: return user_id, "", "", 0, {} # pinも返す
+        if not supabase: return user_id, "", 0, {}
         try:
             res = supabase.table("logs_student").select("*").eq("user_id", user_id).execute()
-            if not res.data: return user_id, "", "", 0, {}
+            if not res.data: return user_id, "", 0, {}
             df = pd.DataFrame(res.data)
             
-            # 最新のデータから情報を取る
             last_row = df.iloc[-1]
             total = df['action_points'].sum()
-            nickname = last_row['nickname'] if 'nickname' in df.columns else ""
-            
-            # ★ pin_code を取得（保存されていれば）
             pin_code = last_row['pin_code'] if 'pin_code' in df.columns else ""
             
             history = {}
             for _, row in df.iterrows():
                 if row['target_date']: history[row['target_date']] = str(row['actions_str']).split(", ")
-            
-            return user_id, nickname, pin_code, int(total), history
-        except: return user_id, "", "", 0, {}
-   # ★ 修正版：上書き設定（on_conflict）を追加した保存関数
-    def save_student_log(user_id, nickname, target_date, actions, points, memo, q1="", q2="", q3=""):
+            return user_id, pin_code, int(total), history
+        except: return user_id, "", 0, {}
+
+    # Upsert (名前削除版)
+    def save_student_log(user_id, pin_code, target_date, actions, points, memo, q1="", q2="", q3=""):
         if not supabase: return False
         try:
             school_name = user_id.split("_")[0]
             data = {
-                "user_id": user_id, "nickname": nickname, "school_name": school_name,
+                "user_id": user_id,
+                "nickname": "エコヒーロー", # 名前列には固定値
+                "pin_code": pin_code,
+                "school_name": school_name,
                 "target_date": target_date, "actions_str": ", ".join(actions),
                 "action_points": points,
                 "memo": memo, "q1": q1, "q2": q2, "q3": q3
             }
-            # 【重要】 on_conflict で「IDと日付が同じなら上書き」と指定する
             supabase.table("logs_student").upsert(data, on_conflict="user_id, target_date").execute()
             return True
         except Exception as e:
-            st.error(f"保存エラー: {e}") # エラー内容を画面に出して確認できるようにする
+            st.error(f"保存エラー: {e}")
             return False
 
-    # ゲームロジック
     def show_game():
         st.markdown("### ⏱️ 激闘！分別マスター")
         if 'game_state' not in st.session_state: st.session_state.game_state = 'READY'
@@ -249,8 +236,10 @@ def student_app_main():
                 final_time = round(time.time() - st.session_state.g_start, 2)
                 u = st.session_state.student_user
                 try:
+                    # ★ 修正：ランキング用の名前列に「学年・組・番号」を保存
                     supabase.table("game_scores").insert({
-                        "name": u['name'], "school": u['school'], 
+                        "name": u['grade_class'], # 例: 1年 A組 10番
+                        "school": u['school'], 
                         "time": final_time, "date": datetime.date.today().isoformat()
                     }).execute()
                 except: pass
@@ -279,39 +268,54 @@ def student_app_main():
 
     # --- 画面遷移管理 ---
     if 'student_user' not in st.session_state:
+        # 名前入力なしログイン画面
         st.markdown("### 🏫 小学生 エコヒーロー登録")
-        st.markdown("""<div class="login-guide">📌 <strong>学年・組・番号</strong> はいつも同じものを入れてね！</div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="login-guide">📌 <strong>学年・組・番号</strong> と <strong>4ケタのあいことば</strong> を入れてね！</div>""", unsafe_allow_html=True)
         with st.form("student_login"):
             school = st.text_input("小学校名", placeholder="例：倉敷")
             c1, c2, c3 = st.columns(3)
             grade = c1.selectbox("学年", ["1年", "2年", "3年", "4年", "5年", "6年"])
             u_class = c2.text_input("組", placeholder="1, A")
             num = c3.number_input("出席番号", 1, 50)
-            name = st.text_input("ニックネーム (ひらがな)")
+            
+            st.markdown("---")
+            pin = st.text_input("あいことば (数字4桁)", max_chars=4, type="password", help="忘れない数字にしてね！")
+
             if st.form_submit_button("スタート！"):
-                if school and u_class and name:
+                if school and u_class and pin:
                     uid = f"{school}小学校_{grade}_{u_class}_{num}"
-                    _, saved_name, total, hist = fetch_student_data(uid)
+                    _, saved_pin, total, hist = fetch_student_data(uid)
                     
-                    cookie_manager.set("decokatsu_user_id", uid, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
-                    
-                    st.session_state.student_user = {
-                        "id": uid, "name": saved_name if saved_name else name,
-                        "school": f"{school}小学校", "total": total, "history": hist
-                    }
-                    st.rerun()
+                    can_login = False
+                    if saved_pin:
+                        if saved_pin == pin: can_login = True
+                        else: st.error("🙅‍♂️ あいことば が違います！")
+                    else:
+                        can_login = True
+                        saved_pin = pin
+
+                    if can_login:
+                        cookie_manager.set("decokatsu_user_id", uid, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+                        st.session_state.student_user = {
+                            "id": uid, 
+                            "school": f"{school}小学校", 
+                            "grade_class": f"{grade} {u_class}組 {num}番", # ここがランキングに使われる
+                            "total": total, "history": hist, "pin": saved_pin
+                        }
+                        st.rerun()
+                else:
+                    st.warning("すべて入力してください")
         if st.button("⬅️ TOPに戻る"):
             st.session_state.app_mode = 'select'
             st.rerun()
             
     else:
         user = st.session_state.student_user
-        st.markdown(f"### 👋 こんにちは、{user['name']} さん！")
-        st.caption(f"ID: {user['id']}") 
+        st.markdown(f"### 👋 こんにちは、{user['grade_class']} のお友達！")
         
         is_hero = any("環境の日アンケート" in acts for acts in user['history'].values())
         if is_hero:
-            st.markdown(f"""<div class="hero-card"><div class="hero-name">🏆 認定エコヒーロー</div><br>{user['name']} 殿<br><small>2026.6.5 認定</small></div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div class="hero-card"><div class="hero-name">🏆 認定エコヒーロー</div><br>認定エコヒーロー 殿<br><small>2026.6.5 認定</small></div>""", unsafe_allow_html=True)
 
         show_my_tree(user['total'])
 
@@ -338,7 +342,6 @@ def student_app_main():
         df = pd.DataFrame(df_data, index=[v['label'] for v in actions.values()])
         edited = st.data_editor(df, column_config={d: st.column_config.CheckboxColumn(d) for d in dates}, use_container_width=True)
 
-        # ★ 保存ボタン (修正版：Upsertロジック)
         if st.button("✅ 記録を保存する", type="primary"):
             saved_cnt = 0
             curr_hist = user['history'].copy()
@@ -355,19 +358,16 @@ def student_app_main():
                 
                 prev_acts = curr_hist.get(d, [])
                 if set(acts_to_save) != set(prev_acts):
-                    # 差分ではなく「その日の合計(pt_day)」を保存する
-                    if save_student_log(user['id'], user['name'], d, acts_to_save, pt_day, "一括"):
+                    if save_student_log(user['id'], user['pin'], d, acts_to_save, pt_day, "一括"):
                         curr_hist[d] = acts_to_save
                         saved_cnt += 1
                     else:
                         error_slot.error(f"保存エラー: {d}")
             
             if saved_cnt > 0:
-                # 合計点の再計算（DB同期）
                 _, _, new_total, _ = fetch_student_data(user['id'])
                 st.session_state.student_user['total'] = new_total
                 st.session_state.student_user['history'] = curr_hist
-                
                 st.balloons()
                 st.success("保存しました！")
                 time.sleep(1)
@@ -380,7 +380,7 @@ def student_app_main():
             q1 = st.radio("チャレンジどうだった？", ["最高！", "普通", "まだまだ"], key="q1")
             memo = st.text_input("感想を一言", key="memo")
             if st.button("送信して認定証ゲット"):
-                if save_student_log(user['id'], user['name'], "6/5(金)", ["環境の日アンケート"], 100, memo, q1=q1):
+                if save_student_log(user['id'], user['pin'], "6/5(金)", ["環境の日アンケート"], 100, memo, q1=q1):
                     st.success("送信しました！")
                     st.session_state.student_user['history']["6/5(金)"] = ["環境の日アンケート"]
                     st.rerun()
@@ -450,7 +450,6 @@ def member_app_main():
                         "is_done": True, "points": pt
                     })
         try:
-            # JCは人数が少ないので、Delete -> Insert 方式を継続（チェック外しの対応が楽なため）
             supabase.table("logs_member").delete().eq("user_name", user_name).eq("lom_name", lom_name).in_("target_date", TARGET_DATES).execute()
             if insert_list: supabase.table("logs_member").insert(insert_list).execute()
             return True
@@ -466,7 +465,6 @@ def member_app_main():
                 if name:
                     ckey = f"{lom}_{name}"
                     cookie_manager.set("decokatsu_user_id", ckey, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
-                    
                     st.session_state.jc_user = {"lom": lom, "name": name}
                     st.rerun()
                 else: st.warning("氏名を入力してください")
@@ -526,27 +524,33 @@ def member_app_main():
             st.rerun()
 
 # ==========================================
-#  4. メイン実行ブロック（入り口）
+#  4. メイン実行ブロック
 # ==========================================
 
 def main_selector():
-    # 1. Cookieによる自動ログインチェック
     cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
     
     if 'student_user' not in st.session_state and 'jc_user' not in st.session_state:
         if cookie_user_id and len(str(cookie_user_id)) > 3:
             if "小学校" in str(cookie_user_id):
-                # 小学生自動ログイン
                 try:
                     with st.spinner("自動ログイン中..."):
-                        _, saved_name, total, hist = fetch_student_data(cookie_user_id)
-                        sch = cookie_user_id.split("_")[0]
-                        st.session_state.student_user = {"id": cookie_user_id, "name": saved_name, "school": sch, "total": total, "history": hist}
+                        uid = str(cookie_user_id)
+                        _, saved_pin, total, hist = fetch_student_data(uid)
+                        
+                        parts = uid.split("_") # [学校, 学年, 組, 番号]
+                        disp_name = f"{parts[1]} {parts[2]}組 {parts[3]}番"
+                        
+                        st.session_state.student_user = {
+                            "id": uid, 
+                            "school": parts[0], 
+                            "grade_class": disp_name, 
+                            "total": total, "history": hist, "pin": saved_pin
+                        }
                         st.session_state.app_mode = 'student'
                         st.rerun()
                 except: pass
             else:
-                # JC自動ログイン
                 try:
                     lom, name = str(cookie_user_id).split("_", 1)
                     st.session_state.jc_user = {"lom": lom, "name": name}
@@ -554,7 +558,6 @@ def main_selector():
                     st.rerun()
                 except: pass
 
-    # 2. 通常のアプリ画面
     if 'app_mode' not in st.session_state:
         st.session_state.app_mode = 'select'
 
@@ -582,9 +585,8 @@ def main_selector():
                 st.session_state.app_mode = 'member'
                 st.rerun()
                 
-        # 救済措置：ユーザー切り替え
         st.markdown("<br><br><br>", unsafe_allow_html=True)
-        with st.expander("⚙️ ユーザーを切り替える（名前を間違えたときなど）"):
+        with st.expander("⚙️ ユーザーを切り替える"):
             st.warning("現在保存されているログイン情報をリセットします。")
             if st.button("ログイン情報をリセット"):
                 cookie_manager.set("decokatsu_user_id", "", key="reset_cookie")
