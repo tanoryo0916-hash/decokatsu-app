@@ -5,8 +5,8 @@ import time
 import os
 import base64
 import random
-import extra_streamlit_components as stx
 from supabase import create_client, Client
+import extra_streamlit_components as stx
 
 # ==========================================
 #  0. 全体設定
@@ -31,16 +31,16 @@ def init_connection():
 
 supabase = init_connection()
 
-# ==========================================
-#  1. 共通関数 & 統計ダッシュボード
-# ==========================================
-
-# --- 🍪 Cookie管理用 ---
+# --- Cookieマネージャー (自動ログイン用) ---
 @st.cache_resource(experimental_allow_widgets=True)
 def get_manager():
     return stx.CookieManager()
 
 cookie_manager = get_manager()
+
+# ==========================================
+#  1. 共通関数 & 統計ダッシュボード
+# ==========================================
 
 # 音声再生用
 def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
@@ -55,6 +55,36 @@ def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
         return f"""<div style="width:0; height:0; overflow:hidden;"><audio id="{element_id}" {loop_attr} autoplay><source src="data:{mime_type};base64,{b64}" type="audio/mp3"></audio></div>"""
     except:
         return ""
+
+# 🌍 全体の成長ステージロジック（3万人目標版）
+def get_global_stage(total_g):
+    if total_g < 100000: return "🌱", "希望の芽生え", "まずは 100kg を目指そう！", "#E0F7FA", 100000
+    elif total_g < 500000: return "🌳", "地域のシンボルツリー", "つぎは 500kg！大きな木に！", "#C8E6C9", 500000
+    elif total_g < 2000000: return "🌲", "深まる緑の森", "目指せ 2トン！森を広げよう", "#81C784", 2000000
+    elif total_g < 5000000: return "⛰️", "雄大なグリーンマウンテン", "つぎは 5トン！山を作ろう", "#4DB6AC", 5000000
+    elif total_g < 10000000: return "🌏", "美しい地球", "奇跡の 10トンを目指して！", "#4FC3F7", 10000000
+    else: return "🪐", "銀河一のエコ地域", "伝説達成！15トンまであと少し！", "#B39DDB", 15000000
+
+def show_global_stage_visual(total_g):
+    icon, title, msg, bg, next_val = get_global_stage(total_g)
+    progress = 1.0 if next_val == 15000000 else min(total_g / next_val, 1.0)
+    
+    # 単位調整
+    if total_g < 1000: disp_val = f"{total_g:,} g"
+    elif total_g < 1000000: disp_val = f"{total_g/1000:.1f} kg"
+    else: disp_val = f"{total_g/1000000:.2f} t"
+
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, {bg}, #ffffff); border: 4px solid {bg}; border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+        <div style="font-size: 14px; font-weight:bold; color:#546E7A; margin-bottom:5px;">現在の オール岡山ステージ</div>
+        <div style="font-size: 80px; animation: pulse 2s infinite; margin: 10px 0;">{icon}</div>
+        <div style="font-size: 24px; font-weight: 900; color: #37474F;">{title}</div>
+        <div style="font-size: 32px; font-weight: 900; color: #00897B; margin: 5px 0;">{disp_val} <span style="font-size:16px; color:#555;">削減中！</span></div>
+        <div style="background:rgba(255,255,255,0.6); padding:5px 15px; border-radius:20px; display:inline-block; font-weight:bold; color:#455A64;">🚀 {msg}</div>
+    </div>
+    <style>@keyframes pulse {{ 0% {{ transform: scale(1); }} 50% {{ transform: scale(1.1); }} 100% {{ transform: scale(1); }} }}</style>
+    """, unsafe_allow_html=True)
+    st.progress(progress)
 
 # ダッシュボード用データ取得 (10分キャッシュ)
 @st.cache_data(ttl=600)
@@ -93,82 +123,11 @@ def fetch_dashboard_stats():
 
     return hero_count, total_participants, total_co2, df_ranking
 
-# --- 🌍 全体の成長ステージロジック（3万人目標版） ---
-def get_global_stage(total_g):
-    # ステージ分岐
-    # 目標: 3万人が500g削減 = 15トン (15,000,000g)
-    
-    if total_g < 100000: # 100kg未満
-        return "🌱", "希望の芽生え", "まずは 100kg を目指そう！", "#E0F7FA", 100000
-    elif total_g < 500000: # 500kg未満
-        return "🌳", "地域のシンボルツリー", "つぎは 500kg！大きな木に！", "#C8E6C9", 500000
-    elif total_g < 2000000: # 2トン未満 (約4,000人達成レベル)
-        return "🌲", "深まる緑の森", "目指せ 2トン！森を広げよう", "#81C784", 2000000
-    elif total_g < 5000000: # 5トン未満 (約10,000人達成レベル)
-        return "⛰️", "雄大なグリーンマウンテン", "つぎは 5トン！山を作ろう", "#4DB6AC", 5000000
-    elif total_g < 10000000: # 10トン未満 (約20,000人達成レベル)
-        return "🌏", "美しい地球", "奇跡の 10トンを目指して！", "#4FC3F7", 10000000
-    else:
-        # 10トン以上で最終形態 (2万人以上が頑張れば到達)
-        return "🪐", "銀河一のエコ地域", "伝説達成！15トンまであと少し！", "#B39DDB", 15000000
-
-def show_global_stage_visual(total_g):
-    icon, title, msg, bg, next_val = get_global_stage(total_g)
-    
-    # プログレス計算
-    progress = 1.0 if next_val == 99999999 else min(total_g / next_val, 1.0)
-    
-    # 表示用数値の整形（g, kg, t）
-    if total_g < 1000: disp_val = f"{total_g:,} g"
-    elif total_g < 1000000: disp_val = f"{total_g/1000:.1f} kg"
-    else: disp_val = f"{total_g/1000000:.2f} t"
-
-    st.markdown(f"""
-    <div style="
-        background: linear-gradient(135deg, {bg}, #ffffff);
-        border: 4px solid {bg};
-        border-radius: 20px;
-        padding: 20px;
-        text-align: center;
-        margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    ">
-        <div style="font-size: 14px; font-weight:bold; color:#546E7A; margin-bottom:5px;">
-            現在の オール岡山ステージ
-        </div>
-        <div style="
-            font-size: 80px; 
-            animation: pulse 2s infinite;
-            margin: 10px 0;
-        ">
-            {icon}
-        </div>
-        <div style="font-size: 24px; font-weight: 900; color: #37474F;">
-            {title}
-        </div>
-        <div style="font-size: 32px; font-weight: 900; color: #00897B; margin: 5px 0;">
-            {disp_val} <span style="font-size:16px; color:#555;">削減中！</span>
-        </div>
-        <div style="background:rgba(255,255,255,0.6); padding:5px 15px; border-radius:20px; display:inline-block; font-weight:bold; color:#455A64;">
-            🚀 {msg}
-        </div>
-    </div>
-    <style>
-    @keyframes pulse {{
-        0% {{ transform: scale(1); }}
-        50% {{ transform: scale(1.1); }}
-        100% {{ transform: scale(1); }}
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-    
-    st.progress(progress)
-
-# ダッシュボード表示（修正版）
+# ダッシュボード表示
 def show_global_dashboard():
     hero_cnt, part_cnt, co2_total, df_rank = fetch_dashboard_stats()
 
-    # ★ ここに追加：全体の成長ビジュアル ★
+    # ビジュアル表示
     show_global_stage_visual(co2_total)
 
     st.markdown("### 📊 詳細データ")
@@ -200,7 +159,7 @@ def student_app_main():
     </style>
     """, unsafe_allow_html=True)
 
-    # 木の成長ロジック (1000g版)
+    # 🌳 木の成長ロジック (1000g完結版)
     def get_tree_stage(total_points):
         if total_points == 0: return "🟤", "まだ 土の中...", 50, "#EFEBE9"
         elif total_points < 100: return "🌱", "芽がでた！", 100, "#E8F5E9"
@@ -217,11 +176,12 @@ def student_app_main():
 
         st.markdown(f"""
         <div style="background-color: {bg_color}; border: 4px solid #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 20px; padding: 20px; text-align: center; margin-bottom: 20px;">
-            <div style="font-size: 100px; line-height: 1.2;">{icon}</div>
+            <div style="font-size: 100px; line-height: 1.2; animation: float 3s ease-in-out infinite;">{icon}</div>
             <div style="font-size: 24px; font-weight: 900; color: #2E7D32; margin-top: 10px;">{status_text}</div>
             <div style="font-size: 14px; color: #666;">(合計: {total_points} g)</div>
             <div style="margin-top: 10px; font-weight:bold; color:#555;">{rest_msg}</div>
         </div>
+        <style>@keyframes float {{ 0% {{ transform: translateY(0px); }} 50% {{ transform: translateY(-10px); }} 100% {{ transform: translateY(0px); }} }}</style>
         """, unsafe_allow_html=True)
         st.progress(progress)
 
@@ -252,7 +212,6 @@ def student_app_main():
             supabase.table("logs_student").insert(data).execute()
             return True
         except Exception as e:
-            st.error(f"Save Error: {e}")
             return False
 
     # ゲームロジック
@@ -293,7 +252,7 @@ def student_app_main():
             st.info(f"第{q_idx+1}問: {item['name']}")
             c1, c2, c3 = st.columns(3)
             def ans(c):
-                if c != item['type']: pass # ペナルティなし
+                # 簡易化のためペナルティなしで進行
                 st.session_state.g_idx += 1
             with c1: 
                 if st.button(cats[0], key=f"g{q_idx}0"): ans(0); st.rerun()
@@ -325,6 +284,10 @@ def student_app_main():
                 if school and u_class and name:
                     uid = f"{school}小学校_{grade}_{u_class}_{num}"
                     _, saved_name, total, hist = fetch_student_data(uid)
+                    
+                    # Cookie保存 (30日)
+                    cookie_manager.set("decokatsu_user_id", uid, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+                    
                     st.session_state.student_user = {
                         "id": uid, "name": saved_name if saved_name else name,
                         "school": f"{school}小学校", "total": total, "history": hist
@@ -344,7 +307,7 @@ def student_app_main():
         if is_hero:
             st.markdown(f"""<div class="hero-card"><div class="hero-name">🏆 認定エコヒーロー</div><br>{user['name']} 殿<br><small>2026.6.5 認定</small></div>""", unsafe_allow_html=True)
 
-        # 木の成長表示 (ここを差し替えました)
+        # 木の成長表示
         show_my_tree(user['total'])
 
         st.divider()
@@ -397,7 +360,7 @@ def student_app_main():
                         curr_hist[d] = acts_to_save
                         saved_cnt += 1
                     else:
-                        error_slot.error(f"保存失敗: {d}")
+                        error_slot.error(f"保存エラー: {d} (DB接続を確認してください)")
             
             if saved_cnt > 0:
                 st.session_state.student_user['total'] += new_pt
@@ -421,6 +384,7 @@ def student_app_main():
                     st.rerun()
 
         if st.button("ログアウト"):
+            cookie_manager.delete("decokatsu_user_id")
             del st.session_state.student_user
             st.rerun()
 
@@ -430,7 +394,7 @@ def student_app_main():
 # ==========================================
 
 def member_app_main():
-    # CSS
+    # CSS (ダークモード対策: 文字色指定)
     st.markdown("""
     <style>
         .stButton>button { width: 100%; height: 60px; font-weight: bold; border-radius: 10px; background-color: #0277BD; color: white; }
@@ -497,6 +461,10 @@ def member_app_main():
             name = st.text_input("氏名", placeholder="例：岡山 太郎")
             if st.form_submit_button("ログイン"):
                 if name:
+                    # Cookie保存 (30日) - JCは "LOM_Name" をキーにする
+                    ckey = f"{lom}_{name}"
+                    cookie_manager.set("decokatsu_user_id", ckey, expires_at=datetime.datetime.now() + datetime.timedelta(days=30))
+                    
                     st.session_state.jc_user = {"lom": lom, "name": name}
                     st.rerun()
                 else: st.warning("氏名を入力してください")
@@ -550,6 +518,7 @@ def member_app_main():
                 st.markdown(f"""<div class="lom-ranking {cls}"><strong>{rk}位 {r['lom_name']}JC</strong> <span style="float:right; font-weight:bold; color:#0277BD;">{r['points']:,} pt</span></div>""", unsafe_allow_html=True)
 
         if st.button("ログアウト"):
+            cookie_manager.delete("decokatsu_user_id")
             del st.session_state.jc_user
             st.rerun()
 
@@ -558,57 +527,64 @@ def member_app_main():
 # ==========================================
 
 def main_selector():
-    # 1. Cookieから保存されたユーザーIDを取得
+    # 1. Cookieによる自動ログインチェック
     cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
     
-    # 2. セッションに情報がない場合、Cookieチェック
     if 'student_user' not in st.session_state and 'jc_user' not in st.session_state:
-        
-        # Cookieが見つかった場合（＝2回目以降）
         if cookie_user_id:
-            # IDの形式で小学生かJCかを判断
             if "小学校" in str(cookie_user_id):
-                # 小学生としてデータ取得＆自動ログイン
-                with st.spinner("おかえりなさい！自動ログイン中..."):
-                    _, saved_name, total, hist = fetch_student_data(cookie_user_id)
-                    school_name = cookie_user_id.split("_")[0]
-                    # 名前が取得できなければ（データ消去等）、Cookieも無効とみなす
-                    if saved_name:
-                        st.session_state.student_user = {
-                            "id": cookie_user_id, "name": saved_name,
-                            "school": school_name, "total": total, "history": hist
-                        }
+                # 小学生自動ログイン
+                try:
+                    with st.spinner("おかえりなさい！自動ログイン中..."):
+                        _, saved_name, total, hist = fetch_student_data(cookie_user_id)
+                        sch = cookie_user_id.split("_")[0]
+                        st.session_state.student_user = {"id": cookie_user_id, "name": saved_name, "school": sch, "total": total, "history": hist}
                         st.session_state.app_mode = 'student'
                         st.rerun()
-            
+                except: pass
             else:
-                # JCメンバーとしてデータ取得＆自動ログイン
-                # 形式: "LOM名_氏名" (保存時にこの形式にする必要あり)
+                # JC自動ログイン
                 try:
-                    lom, name = cookie_user_id.split("_", 1)
+                    lom, name = str(cookie_user_id).split("_", 1)
                     st.session_state.jc_user = {"lom": lom, "name": name}
                     st.session_state.app_mode = 'member'
                     st.rerun()
-                except:
-                    pass # フォーマットエラー等は無視してログイン画面へ
+                except: pass
 
-    # --- 以下、通常の画面分岐ロジック ---
-
+    # 2. 通常のアプリ画面
     if 'app_mode' not in st.session_state:
         st.session_state.app_mode = 'select'
 
-    # (中略) ... これまでの main_selector の中身と同じデザインコード ...
-
     if st.session_state.app_mode == 'select':
-        # ... (ヘッダーやダッシュボードの表示) ...
-        # ... (ボタンの表示) ...
-        # ここは変更なし
+        st.markdown("""
+        <div style="background:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1501854140801-50d01698950b'); background-size:cover; padding:60px 20px; border-radius:20px; text-align:center; color:white; margin-bottom:30px;">
+            <h1 style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🍑 おかやまデコ活チャレンジ</h1>
+            <p style="font-weight:bold; background:rgba(255,152,0,0.9); display:inline-block; padding:5px 15px; border-radius:20px;">みんなの行動で未来を変えよう！</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 全体ダッシュボード
+        show_global_dashboard()
         
-        # 省略... (既存のコード)
-        pass 
+        st.markdown("---")
+        st.markdown("### 👇 参加する方を選んでね")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🎒 小学生のみんな\n(エコヒーロー)", type="primary"):
+                st.session_state.app_mode = 'student'
+                st.rerun()
+        
+        with col2:
+            if st.button("👔 JCメンバー\n(LOM対抗戦)"):
+                st.session_state.app_mode = 'member'
+                st.rerun()
 
     elif st.session_state.app_mode == 'student':
         student_app_main()
 
     elif st.session_state.app_mode == 'member':
         member_app_main()
+
+if __name__ == "__main__":
+    main_selector()
