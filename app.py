@@ -527,9 +527,19 @@ def member_app_main():
 # ==========================================
 
 def main_selector():
-    # 1. Cookieによる自動ログインチェック
-    cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
+    # --- 1. 自動ログイン判定ロジック ---
     
+    # ログアウト直後かどうかを確認
+    if st.session_state.get("logout_flag", False):
+        # ログアウト直後なら、Cookieを見ずに無視する
+        cookie_user_id = None
+        # フラグを元に戻す（次回以降はまたチェックするように）
+        st.session_state["logout_flag"] = False
+    else:
+        # 通常時はCookieを取得
+        cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
+    
+    # セッションにユーザー情報がない、かつ、Cookie（または無視済み）がある場合
     if 'student_user' not in st.session_state and 'jc_user' not in st.session_state:
         if cookie_user_id:
             if "小学校" in str(cookie_user_id):
@@ -551,11 +561,12 @@ def main_selector():
                     st.rerun()
                 except: pass
 
-    # 2. 通常のアプリ画面
+    # --- 2. 画面分岐 ---
     if 'app_mode' not in st.session_state:
         st.session_state.app_mode = 'select'
 
     if st.session_state.app_mode == 'select':
+        # ... (ここは変更なし) ...
         st.markdown("""
         <div style="background:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1501854140801-50d01698950b'); background-size:cover; padding:60px 20px; border-radius:20px; text-align:center; color:white; margin-bottom:30px;">
             <h1 style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🍑 おかやまデコ活チャレンジ</h1>
@@ -563,7 +574,6 @@ def main_selector():
         </div>
         """, unsafe_allow_html=True)
 
-        # 全体ダッシュボード
         show_global_dashboard()
         
         st.markdown("---")
