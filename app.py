@@ -521,9 +521,14 @@ def member_app_main():
                 cls = "rank-1" if rk==1 else ""
                 st.markdown(f"""<div class="lom-ranking {cls}"><strong>{rk}位 {r['lom_name']}JC</strong> <span style="float:right; font-weight:bold; color:#0277BD;">{r['points']:,} pt</span></div>""", unsafe_allow_html=True)
 
+       # --- 修正版：JCログアウト ---
         if st.button("ログアウト"):
+            # Cookie削除命令
             cookie_manager.delete("decokatsu_user_id")
-            del st.session_state.jc_user
+            # セッション削除
+            st.session_state.pop('jc_user', None)
+            # ★重要: フラグを立てる
+            st.session_state['logout_flag'] = True
             st.rerun()
 
 # ==========================================
