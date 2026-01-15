@@ -5,6 +5,7 @@ import time
 import os
 import base64
 import random
+import extra_streamlit_components as stx
 from supabase import create_client, Client
 
 # ==========================================
