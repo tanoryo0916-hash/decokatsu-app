@@ -383,11 +383,15 @@ def student_app_main():
                     st.session_state.student_user['history']["6/5(金)"] = ["環境の日アンケート"]
                     st.rerun()
 
+       # --- 修正版：小学生ログアウト ---
         if st.button("ログアウト"):
+            # Cookie削除命令
             cookie_manager.delete("decokatsu_user_id")
-            del st.session_state.student_user
+            # セッション削除（エラー回避のためpopを使用）
+            st.session_state.pop('student_user', None)
+            # ★重要: 「今ログアウトしたよ」というフラグを立てる
+            st.session_state['logout_flag'] = True
             st.rerun()
-
 
 # ==========================================
 #  3. JCメンバー用アプリ ロジック
