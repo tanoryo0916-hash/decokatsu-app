@@ -558,39 +558,57 @@ def member_app_main():
 # ==========================================
 
 def main_selector():
+    # 1. Cookieから保存されたユーザーIDを取得
+    cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
+    
+    # 2. セッションに情報がない場合、Cookieチェック
+    if 'student_user' not in st.session_state and 'jc_user' not in st.session_state:
+        
+        # Cookieが見つかった場合（＝2回目以降）
+        if cookie_user_id:
+            # IDの形式で小学生かJCかを判断
+            if "小学校" in str(cookie_user_id):
+                # 小学生としてデータ取得＆自動ログイン
+                with st.spinner("おかえりなさい！自動ログイン中..."):
+                    _, saved_name, total, hist = fetch_student_data(cookie_user_id)
+                    school_name = cookie_user_id.split("_")[0]
+                    # 名前が取得できなければ（データ消去等）、Cookieも無効とみなす
+                    if saved_name:
+                        st.session_state.student_user = {
+                            "id": cookie_user_id, "name": saved_name,
+                            "school": school_name, "total": total, "history": hist
+                        }
+                        st.session_state.app_mode = 'student'
+                        st.rerun()
+            
+            else:
+                # JCメンバーとしてデータ取得＆自動ログイン
+                # 形式: "LOM名_氏名" (保存時にこの形式にする必要あり)
+                try:
+                    lom, name = cookie_user_id.split("_", 1)
+                    st.session_state.jc_user = {"lom": lom, "name": name}
+                    st.session_state.app_mode = 'member'
+                    st.rerun()
+                except:
+                    pass # フォーマットエラー等は無視してログイン画面へ
+
+    # --- 以下、通常の画面分岐ロジック ---
+
     if 'app_mode' not in st.session_state:
         st.session_state.app_mode = 'select'
 
-    if st.session_state.app_mode == 'select':
-        st.markdown("""
-        <div style="background:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1501854140801-50d01698950b'); background-size:cover; padding:60px 20px; border-radius:20px; text-align:center; color:white; margin-bottom:30px;">
-            <h1 style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🍑 おかやまデコ活チャレンジ</h1>
-            <p style="font-weight:bold; background:rgba(255,152,0,0.9); display:inline-block; padding:5px 15px; border-radius:20px;">みんなの行動で未来を変えよう！</p>
-        </div>
-        """, unsafe_allow_html=True)
+    # (中略) ... これまでの main_selector の中身と同じデザインコード ...
 
-        # ★ 統計ダッシュボードを表示
-        show_global_dashboard()
+    if st.session_state.app_mode == 'select':
+        # ... (ヘッダーやダッシュボードの表示) ...
+        # ... (ボタンの表示) ...
+        # ここは変更なし
         
-        st.markdown("---")
-        st.markdown("### 👇 参加する方を選んでね")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🎒 小学生のみんな\n(エコヒーロー)", type="primary"):
-                st.session_state.app_mode = 'student'
-                st.rerun()
-        
-        with col2:
-            if st.button("👔 JCメンバー\n(LOM対抗戦)"):
-                st.session_state.app_mode = 'member'
-                st.rerun()
+        # 省略... (既存のコード)
+        pass 
 
     elif st.session_state.app_mode == 'student':
         student_app_main()
 
     elif st.session_state.app_mode == 'member':
         member_app_main()
-
-if __name__ == "__main__":
-    main_selector()
