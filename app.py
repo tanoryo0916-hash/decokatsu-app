@@ -199,7 +199,7 @@ def student_app_main():
             return user_id, nickname, int(total), history
         except: return user_id, "", 0, {}
 
-    # ★ 修正版：Upsert（上書き）を使用
+   # ★ 修正版：上書き設定（on_conflict）を追加した保存関数
     def save_student_log(user_id, nickname, target_date, actions, points, memo, q1="", q2="", q3=""):
         if not supabase: return False
         try:
@@ -207,13 +207,14 @@ def student_app_main():
             data = {
                 "user_id": user_id, "nickname": nickname, "school_name": school_name,
                 "target_date": target_date, "actions_str": ", ".join(actions),
-                "action_points": points, # ここに「その日の合計」を入れる
+                "action_points": points,
                 "memo": memo, "q1": q1, "q2": q2, "q3": q3
             }
-            # upsert で上書き保存（制約: user_id + target_date）
-            supabase.table("logs_student").upsert(data).execute()
+            # 【重要】 on_conflict で「IDと日付が同じなら上書き」と指定する
+            supabase.table("logs_student").upsert(data, on_conflict="user_id, target_date").execute()
             return True
         except Exception as e:
+            st.error(f"保存エラー: {e}") # エラー内容を画面に出して確認できるようにする
             return False
 
     # ゲームロジック
