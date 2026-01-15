@@ -32,7 +32,7 @@ def init_connection():
 supabase = init_connection()
 
 # --- Cookieマネージャー (自動ログイン用) ---
-# 修正: @st.cache_resource を削除しました
+# ※重要: @st.cache_resource は付けない（エラー回避のため）
 def get_manager():
     return stx.CookieManager()
 
@@ -56,7 +56,7 @@ def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
     except:
         return ""
 
-# 🌍 全体の成長ステージロジック（3万人目標版）
+# 🌍 全体の成長ステージロジック（3万人目標版: 15トンゴール）
 def get_global_stage(total_g):
     if total_g < 100000: return "🌱", "希望の芽生え", "まずは 100kg を目指そう！", "#E0F7FA", 100000
     elif total_g < 500000: return "🌳", "地域のシンボルツリー", "つぎは 500kg！大きな木に！", "#C8E6C9", 500000
@@ -334,7 +334,7 @@ def student_app_main():
         df = pd.DataFrame(df_data, index=[v['label'] for v in actions.values()])
         edited = st.data_editor(df, column_config={d: st.column_config.CheckboxColumn(d) for d in dates}, use_container_width=True)
 
-        # ★ 保存ボタン (修正版)
+        # 保存ボタン (修正版)
         if st.button("✅ 記録を保存する", type="primary"):
             saved_cnt = 0
             new_pt = 0
@@ -360,7 +360,7 @@ def student_app_main():
                         curr_hist[d] = acts_to_save
                         saved_cnt += 1
                     else:
-                        error_slot.error(f"保存エラー: {d} (DB接続を確認してください)")
+                        error_slot.error(f"保存エラー: {d}")
             
             if saved_cnt > 0:
                 st.session_state.student_user['total'] += new_pt
@@ -383,15 +383,13 @@ def student_app_main():
                     st.session_state.student_user['history']["6/5(金)"] = ["環境の日アンケート"]
                     st.rerun()
 
-       # --- 修正版：小学生ログアウト ---
-        if st.button("ログアウト"):
-            # Cookie削除命令
-            cookie_manager.delete("decokatsu_user_id")
-            # セッション削除（エラー回避のためpopを使用）
-            st.session_state.pop('student_user', None)
-            # ★重要: 「今ログアウトしたよ」というフラグを立てる
-            st.session_state['logout_flag'] = True
+        # 戻るボタン (ログアウトなし、セッションクリアのみ)
+        if st.button("⬅️ TOPに戻る"):
+            if 'student_user' in st.session_state:
+                del st.session_state.student_user
+            st.session_state.app_mode = 'select'
             st.rerun()
+
 
 # ==========================================
 #  3. JCメンバー用アプリ ロジック
@@ -521,14 +519,11 @@ def member_app_main():
                 cls = "rank-1" if rk==1 else ""
                 st.markdown(f"""<div class="lom-ranking {cls}"><strong>{rk}位 {r['lom_name']}JC</strong> <span style="float:right; font-weight:bold; color:#0277BD;">{r['points']:,} pt</span></div>""", unsafe_allow_html=True)
 
-       # --- 修正版：JCログアウト ---
-        if st.button("ログアウト"):
-            # Cookie削除命令
-            cookie_manager.delete("decokatsu_user_id")
-            # セッション削除
-            st.session_state.pop('jc_user', None)
-            # ★重要: フラグを立てる
-            st.session_state['logout_flag'] = True
+        # 戻るボタン (ログアウトなし、セッションクリアのみ)
+        if st.button("⬅️ TOPに戻る"):
+            if 'jc_user' in st.session_state:
+                del st.session_state.jc_user
+            st.session_state.app_mode = 'select'
             st.rerun()
 
 # ==========================================
@@ -536,25 +531,17 @@ def member_app_main():
 # ==========================================
 
 def main_selector():
-    # --- 1. 自動ログイン判定ロジック ---
+    # 1. Cookieによる自動ログインチェック
+    cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
     
-    # ログアウト直後かどうかを確認
-    if st.session_state.get("logout_flag", False):
-        # ログアウト直後なら、Cookieを見ずに無視する
-        cookie_user_id = None
-        # フラグを元に戻す（次回以降はまたチェックするように）
-        st.session_state["logout_flag"] = False
-    else:
-        # 通常時はCookieを取得
-        cookie_user_id = cookie_manager.get(cookie="decokatsu_user_id")
-    
-    # セッションにユーザー情報がない、かつ、Cookie（または無視済み）がある場合
+    # ログイン済みでなければチェック
     if 'student_user' not in st.session_state and 'jc_user' not in st.session_state:
-        if cookie_user_id:
+        if cookie_user_id and len(str(cookie_user_id)) > 3:
             if "小学校" in str(cookie_user_id):
                 # 小学生自動ログイン
                 try:
-                    with st.spinner("おかえりなさい！自動ログイン中..."):
+                    # スピナーは一瞬だけ表示
+                    with st.spinner("自動ログイン中..."):
                         _, saved_name, total, hist = fetch_student_data(cookie_user_id)
                         sch = cookie_user_id.split("_")[0]
                         st.session_state.student_user = {"id": cookie_user_id, "name": saved_name, "school": sch, "total": total, "history": hist}
@@ -570,12 +557,11 @@ def main_selector():
                     st.rerun()
                 except: pass
 
-    # --- 2. 画面分岐 ---
+    # 2. 通常のアプリ画面
     if 'app_mode' not in st.session_state:
         st.session_state.app_mode = 'select'
 
     if st.session_state.app_mode == 'select':
-        # ... (ここは変更なし) ...
         st.markdown("""
         <div style="background:linear-gradient(rgba(0,0,0,0.3),rgba(0,0,0,0.3)), url('https://images.unsplash.com/photo-1501854140801-50d01698950b'); background-size:cover; padding:60px 20px; border-radius:20px; text-align:center; color:white; margin-bottom:30px;">
             <h1 style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8);">🍑 おかやまデコ活チャレンジ</h1>
@@ -583,6 +569,7 @@ def main_selector():
         </div>
         """, unsafe_allow_html=True)
 
+        # 全体ダッシュボード
         show_global_dashboard()
         
         st.markdown("---")
@@ -598,6 +585,15 @@ def main_selector():
             if st.button("👔 JCメンバー\n(LOM対抗戦)"):
                 st.session_state.app_mode = 'member'
                 st.rerun()
+                
+        # 救済措置：ユーザー切り替え（Cookieリセット）
+        st.markdown("<br><br><br>", unsafe_allow_html=True)
+        with st.expander("⚙️ ユーザーを切り替える（名前を間違えたときなど）"):
+            st.warning("現在保存されているログイン情報をリセットします。")
+            if st.button("ログイン情報をリセット"):
+                # 削除ではなく空文字で上書きする（確実性のため）
+                cookie_manager.set("decokatsu_user_id", "", key="reset_cookie")
+                st.success("リセットしました。画面を再読み込みしてください。")
 
     elif st.session_state.app_mode == 'student':
         student_app_main()
