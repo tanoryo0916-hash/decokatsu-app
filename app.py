@@ -35,6 +35,13 @@ supabase = init_connection()
 #  1. 共通関数 & 統計ダッシュボード
 # ==========================================
 
+# --- 🍪 Cookie管理用 ---
+@st.cache_resource(experimental_allow_widgets=True)
+def get_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_manager()
+
 # 音声再生用
 def get_audio_html(filename, loop=False, volume=1.0, element_id=None):
     if not os.path.exists(filename): return ""
