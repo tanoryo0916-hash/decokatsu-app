@@ -1,6 +1,9 @@
 import streamlit as st
+import pandas as pd
+import datetime
 import time
 import random
+from supabase import create_client, Client
 
 # ==========================================
 # 1. アプリ設定 & リッチデザインCSS
@@ -103,7 +106,7 @@ st.markdown("""
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
 
-# ★追加★ アクション完了履歴の管理 { "6/1(月)": ["elec", "water"], ... }
+# アクション完了履歴の管理 { "6/1(月)": ["elec", "water"], ... }
 if 'action_log' not in st.session_state: st.session_state.action_log = {}
 
 # ゲーム完了フラグ
@@ -239,7 +242,7 @@ def view_home():
         if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True): st.toast("6月5日オープン！", icon="🔒")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ③ アクション記録画面 (★修正: 1回のみ押せる仕様) ---
+# --- ③ アクション記録画面 (項目追加済み) ---
 def view_action():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
@@ -252,11 +255,13 @@ def view_action():
     
     st.info(f"【{selected}】 できたこと全部にチェック！")
     
-    # アクションの定義
+    # アクションの定義 (5つに増えました)
     acts = [
         ("💡", "電気をこまめに消した", 50, "elec"),
         ("🍚", "ご飯を残さず食べた", 100, "food"),
-        ("💧", "水を大切に使った", 30, "water")
+        ("💧", "水を大切に使った", 30, "water"),
+        ("♻️", "ゴミを正しく分けた", 80, "sort"),
+        ("👨‍👩‍👧", "おうちの人も一緒にできた", 50, "family")
     ]
     
     # この日の完了済みアクションを取得
@@ -270,21 +275,15 @@ def view_action():
             with c_btn:
                 # 判定: すでに完了しているか？
                 if act_id in completed_today:
-                    # 完了している場合：無効化されたボタンを表示
                     st.button(f"✅ 達成済", key=f"done_{selected}_{act_id}", disabled=True, use_container_width=True)
                 else:
-                    # 未完了の場合：押せるボタンを表示
                     if st.button(f"できた! (+{pt})", key=f"{selected}_{act_id}", use_container_width=True):
-                        # 1. ログに保存
                         if selected not in st.session_state.action_log:
                             st.session_state.action_log[selected] = []
                         st.session_state.action_log[selected].append(act_id)
                         
-                        # 2. 演出
                         st.toast(f"ナイス！ {pt}ポイントゲット！", icon="🎉")
                         st.balloons()
-                        
-                        # 3. 画面更新 (ボタンをdisabledにするため)
                         st.rerun()
             st.markdown("---") 
 
