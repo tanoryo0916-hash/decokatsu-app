@@ -11,7 +11,7 @@ from supabase import create_client, Client
 st.set_page_config(
     page_title="おかやまデコ活チャレンジ2026",
     page_icon="🍑",
-    layout="mobile", # スマホ表示に最適化
+    layout="centered",  # ← "centered" に変更してください
     initial_sidebar_state="collapsed"
 )
 
