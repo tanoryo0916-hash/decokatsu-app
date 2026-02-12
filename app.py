@@ -19,40 +19,7 @@ GUIDE_IMAGES = {
 }
 
 # ==========================================
-# 2. 画像処理ロジック
-# ==========================================
-def get_base64_image(image_path):
-    if image_path.startswith("http"): return image_path
-    if not os.path.exists(image_path): return None
-    with open(image_path, "rb") as img_file:
-        return base64.b64encode(img_file.read()).decode()
-
-def render_horizontal_gallery(image_list):
-    html_content = '<div class="scroll-container">'
-    for img_path in image_list:
-        img_data = get_base64_image(img_path)
-        if img_data:
-            src = img_data if img_path.startswith("http") else f"data:image/png;base64,{img_data}"
-            html_content += f'<img src="{src}" class="scroll-item" />'
-        else:
-            dummy_url = f"https://placehold.co/600x400/E0F2F1/00695C?text={os.path.basename(img_path)}"
-            html_content += f'<img src="{dummy_url}" class="scroll-item" />'
-    html_content += '</div>'
-    st.markdown(html_content, unsafe_allow_html=True)
-
-def show_safe_image(img_path):
-    try:
-        if img_path.startswith("http"):
-            st.image(img_path, use_container_width=True)
-        elif os.path.exists(img_path):
-            st.image(img_path, use_container_width=True)
-        else:
-            st.warning(f"⚠️ 画像が見つかりません: {img_path}")
-    except Exception:
-        st.error("画像読み込みエラー")
-
-# ==========================================
-# 3. アプリ設定 & デザインCSS
+# 2. アプリ設定 & デザインCSS
 # ==========================================
 st.set_page_config(
     page_title="おかやまデコ活チャレンジ2026",
@@ -163,13 +130,12 @@ st.markdown("""
     div[data-baseweb="input"] { border-radius: 15px; border: 2px solid #E0E0E0; }
     div[data-baseweb="select"]>div { border-radius: 15px; border: 2px solid #E0E0E0; }
     
-    /* アクション説明の文字サイズ調整 */
     .act-desc { font-size: 12px; color: #607D8B; margin-top: 2px; line-height: 1.4; }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. データベース接続 & ロジック
+# 3. データベース接続 & ロジック
 # ==========================================
 @st.cache_resource
 def init_connection():
@@ -182,6 +148,34 @@ def init_connection():
 
 supabase = init_connection()
 
+# 画像処理ロジック
+def get_base64_image(image_path):
+    if image_path.startswith("http"): return image_path
+    if not os.path.exists(image_path): return None
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+def render_horizontal_gallery(image_list):
+    html_content = '<div class="scroll-container">'
+    for img_path in image_list:
+        img_data = get_base64_image(img_path)
+        if img_data:
+            src = img_data if img_path.startswith("http") else f"data:image/png;base64,{img_data}"
+            html_content += f'<img src="{src}" class="scroll-item" />'
+        else:
+            dummy_url = f"https://placehold.co/600x400/E0F2F1/00695C?text={os.path.basename(img_path)}"
+            html_content += f'<img src="{dummy_url}" class="scroll-item" />'
+    html_content += '</div>'
+    st.markdown(html_content, unsafe_allow_html=True)
+
+def show_safe_image(img_path):
+    try:
+        if img_path.startswith("http"): st.image(img_path, use_container_width=True)
+        elif os.path.exists(img_path): st.image(img_path, use_container_width=True)
+        else: st.warning(f"⚠️ 画像が見つかりません: {img_path}")
+    except Exception: st.error("画像読み込みエラー")
+
+# --- DB操作関数 ---
 def load_user_data(user_id):
     if not supabase: return {}
     try:
@@ -205,7 +199,43 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
         pass
 
 # ==========================================
-# 5. ステート管理
+# ★認証関数（ニックネーム照合版）
+# ==========================================
+def auth_user(user_id, input_nickname, role, school, grade, u_class):
+    if not supabase: 
+        return True, "デモモードで起動します", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
+
+    try:
+        response = supabase.table("users").select("*").eq("user_id", user_id).execute()
+        existing_user = response.data
+
+        if existing_user:
+            # ログイン処理
+            stored_nickname = existing_user[0]['nickname']
+            if stored_nickname.strip() == input_nickname.strip():
+                return True, "ログイン成功！おかえりなさい！", {
+                    "id": user_id,
+                    "name": stored_nickname, 
+                    "role": role,
+                    "group": f"{school} {grade}-{u_class}"
+                }
+            else:
+                return False, f"⚠️ ニックネームがちがいます！\n登録されている名前: {stored_nickname}", None
+        else:
+            # 新規登録処理
+            new_data = {
+                "user_id": user_id, "nickname": input_nickname,
+                "school": school, "grade": grade, "class_name": u_class
+            }
+            supabase.table("users").insert(new_data).execute()
+            return True, "✨ はじめまして！登録完了！", {
+                "id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"
+            }
+    except Exception as e:
+        return False, f"エラーが発生しました: {e}", None
+
+# ==========================================
+# 4. ステート管理
 # ==========================================
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
@@ -217,10 +247,9 @@ def go_to(page_name):
     st.rerun()
 
 # ==========================================
-# 6. 各画面コンポーネント
+# 5. 各画面コンポーネント
 # ==========================================
 
-# --- ヘッダー ---
 def render_header():
     user = st.session_state.user
     name = user['name'] if user else "ゲスト"
@@ -271,24 +300,62 @@ def view_login_entry():
             go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ログインフォーム ---
+# --- ★ログインフォーム（入力式＆記憶機能付き） ---
 def view_login_form():
     role = st.session_state.temp_role
     st.markdown(f"<div style='text-align:center; margin-bottom:20px;'><h3 style='font-weight:900; margin-bottom:5px;'>情報を入力してね</h3><span style='background:#ECEFF1; padding:5px 15px; border-radius:15px; font-size:12px; font-weight:bold; color:#546E7A;'>{role.upper()}</span></div>", unsafe_allow_html=True)
 
     with st.form("login"):
         if role in ["student", "family"]:
-            school = st.selectbox("小学校", ["倉敷第一小学校", "岡山中央小学校", "津山東小学校"])
+            st.info("※ 同じ「学校・組・番号」を使えるのは1人だけだよ！")
+            
+            # --- ★前回入力した値をURLパラメータから取得（記憶機能） ---
+            # ページリロードやブックマーク経由で前回の値があれば、それを初期値にする
+            qp = st.query_params
+            def_sch = qp.get("sch", "")
+            def_grd = qp.get("grd", "")
+            def_cls = qp.get("cls", "")
+            def_num = qp.get("num", "1")
+            
+            # --- ★入力フォーム（テキスト入力） ---
+            school = st.text_input("小学校名", value=def_sch, placeholder="例：倉敷")
+            
             c1, c2, c3 = st.columns(3)
-            grade = c1.selectbox("学年", ["1年", "2年", "3年", "4年", "5年", "6年"])
-            u_class = c2.text_input("組", "1")
-            num = c3.number_input("番号", 1, 50)
-            name = st.text_input("ニックネーム", "ももたろう")
+            # 学年もテキスト入力に変更
+            grade = c1.text_input("学年", value=def_grd, placeholder="例：5")
+            u_class = c2.text_input("組", value=def_cls, placeholder="例：1")
+            # 番号もテキスト入力（オートコンプリートが効きやすい）
+            num = c3.text_input("番号", value=def_num, placeholder="例：15")
+            
+            st.markdown("---")
+            st.caption("📌 はじめての人は、すきなニックネームを決めてね。")
+            st.caption("📌 2回目からは、**同じニックネーム** をいれてね！")
+            name = st.text_input("ニックネーム", placeholder="ももたろう")
+            
             if st.form_submit_button("🚀 スタート！", type="primary"):
-                user_id = f"{school}_{grade}_{u_class}_{num}"
-                st.session_state.user = {"id": user_id, "name": name, "role": role, "group": f"{school} {grade}-{u_class}"}
-                st.session_state.action_log = load_user_data(user_id)
-                go_to('HOME')
+                if not school or not grade or not u_class or not num or not name:
+                    st.error("⚠️ 全部入力してね！")
+                else:
+                    user_id = f"{school}_{grade}_{u_class}_{num}"
+                    # 認証実行
+                    is_success, msg, user_data = auth_user(user_id, name, role, school, grade, u_class)
+                    
+                    if is_success:
+                        st.session_state.user = user_data
+                        st.session_state.action_log = load_user_data(user_id)
+                        
+                        # --- ★次回のためにパラメータを保存（記憶機能） ---
+                        st.query_params["sch"] = school
+                        st.query_params["grd"] = grade
+                        st.query_params["cls"] = u_class
+                        st.query_params["num"] = num
+                        
+                        st.toast(msg, icon="🎉")
+                        time.sleep(1)
+                        go_to('HOME')
+                    else:
+                        st.error(msg)
+                
         else: # JC or Teacher
             org_label = "所属LOM" if role == "jc" else "担当クラス"
             org_opts = ["岡山JC", "倉敷JC", "津山JC"] if role == "jc" else ["5年2組", "6年1組"]
@@ -304,7 +371,6 @@ def view_login_form():
 def view_home():
     render_header()
 
-    # ガイドブック
     st.markdown("""
     <div class="guidebook-box">
         <div class="guide-title"><span style="font-size:24px;">📚</span> デコ活ガイドブック</div>
@@ -319,7 +385,6 @@ def view_home():
     with tab5: render_horizontal_gallery(GUIDE_IMAGES["future"])
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # デコ活の木
     st.markdown("""
     <div style="text-align:center; position:relative; margin-bottom:30px; margin-top:10px;">
         <div style="font-size:160px; line-height:1; filter: drop-shadow(0 15px 15px rgba(0,100,0,0.2)); z-index:2; position:relative;">🌳</div>
@@ -353,7 +418,7 @@ def view_home():
             st.toast("ガイドブックで勉強してね！", icon="📖")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ★アクション記録画面 (更新版) ---
+# --- アクション記録画面 ---
 def view_action():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
@@ -363,33 +428,12 @@ def view_action():
     selected = st.radio(" ", days, horizontal=True, label_visibility="collapsed")
     st.info(f"【{selected}】 できたこと全部にチェック！")
     
-    # データを定義 (具体的な説明と削減量を追加)
     acts = [
-        {
-            "id": "elec", "icon": "💡", "pt": 50,
-            "title": "だれもいない へやの でんき をけした！",
-            "desc": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"
-        },
-        {
-            "id": "food", "icon": "🍚", "pt": 100,
-            "title": "ごはんを のこさず たべた！",
-            "desc": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"
-        },
-        {
-            "id": "water", "icon": "🚰", "pt": 30,
-            "title": "水（みず）を 大切（たいせつ）に つかった！",
-            "desc": "例：歯みがきの間コップを使って水を止めた、顔を洗うとき出しっぱなしにしなかった（CO2削減 -30g）"
-        },
-        {
-            "id": "sort", "icon": "♻️", "pt": 80,
-            "title": "ゴミを 正（ただ）しく わけた！",
-            "desc": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"
-        },
-        {
-            "id": "family", "icon": "👨‍👩‍👧", "pt": 50,
-            "title": "おうちの 人（ひと）も いっしょに できた！",
-            "desc": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"
-        }
+        {"id": "elec", "icon": "💡", "pt": 50, "title": "だれもいない へやの でんき をけした！", "desc": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"},
+        {"id": "food", "icon": "🍚", "pt": 100, "title": "ごはんを のこさず たべた！", "desc": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"},
+        {"id": "water", "icon": "🚰", "pt": 30, "title": "水（みず）を 大切（たいせつ）に つかった！", "desc": "例：歯みがきの間コップを使って水を止めた、顔を洗うとき出しっぱなしにしなかった（CO2削減 -30g）"},
+        {"id": "sort", "icon": "♻️", "pt": 80, "title": "ゴミを 正（ただ）しく わけた！", "desc": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"},
+        {"id": "family", "icon": "👨‍👩‍👧", "pt": 50, "title": "おうちの 人（ひと）も いっしょに できた！", "desc": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"}
     ]
     
     completed_today = st.session_state.action_log.get(selected, [])
@@ -397,17 +441,12 @@ def view_action():
     for act in acts:
         with st.container():
             c_icon, c_content, c_btn = st.columns([1, 4, 2])
-            
-            with c_icon: 
-                st.markdown(f"<div style='font-size:36px; text-align:center'>{act['icon']}</div>", unsafe_allow_html=True)
-            
+            with c_icon: st.markdown(f"<div style='font-size:36px; text-align:center'>{act['icon']}</div>", unsafe_allow_html=True)
             with c_content:
                 st.markdown(f"<div style='font-weight:bold; font-size:16px; margin-top:5px;'>{act['title']}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='act-desc'>{act['desc']}</div>", unsafe_allow_html=True)
-                
             with c_btn:
-                # ボタン（縦幅を埋めるためにスタイル調整）
-                st.write("") # スペーサー
+                st.write("") 
                 if act['id'] in completed_today:
                     st.button(f"✅ 達成済", key=f"done_{selected}_{act['id']}", disabled=True, use_container_width=True)
                 else:
@@ -415,7 +454,6 @@ def view_action():
                         if selected not in st.session_state.action_log:
                             st.session_state.action_log[selected] = []
                         st.session_state.action_log[selected].append(act['id'])
-                        
                         new_actions = st.session_state.action_log[selected]
                         total_pts = len(new_actions) * 50 
                         sync_action_to_db(st.session_state.user['id'], selected, new_actions, total_pts)
