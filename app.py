@@ -21,7 +21,7 @@ GUIDE_IMAGES = {
         # "action_2.jpg"
     ],
     "future": [
-        "future_1.jpg",
+        "deco_poster_action_ver_01_page-0001.jpg",
         # "future_2.jpg"
     ]
 }
