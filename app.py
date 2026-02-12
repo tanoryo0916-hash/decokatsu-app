@@ -3,27 +3,41 @@ import pandas as pd
 import datetime
 import time
 import random
+import os  # ★追加：ファイルの存在確認用
 from supabase import create_client, Client
 
 # ==========================================
-# 1. 画像ファイルの設定 (★ここを書き換えてください)
+# 1. 画像ファイルの設定
 # ==========================================
-# 準備した画像ファイル名をここに記述します。
-# アプリのファイル(app.py)と同じ場所に画像を置いてください。
+# ★ここに、あなたが用意した画像ファイル名を書いてください。
+# ※ファイルは app.py と同じフォルダに置いてください。
 GUIDE_IMAGES = {
     "basic": [
-        "https://placehold.co/800x600/E0F2F1/00695C?text=資料1：デコ活ってなに？", 
-        # "decokatsu_panel_ver03_page-0001.jpg",  <-- 本番はこのようにファイル名を書く
+        "basic_1.png",  # 例: 1枚目の画像
+        "basic_2.png"   # 例: 2枚目の画像
     ],
     "action": [
-        "https://placehold.co/800x600/FFF3E0/E65100?text=資料2：今日からできるアクション",
-        # "decokatsu_panel_ver03_page-0002.jpg"
+        "action_1.png",
+        # "action_2.png"
     ],
     "future": [
-        "https://placehold.co/800x600/E8EAF6/3F51B5?text=資料3：10年後の豊かな暮らし",
-        # "decokatsu_panel_ver03_page-0003.jpg"
+        "future_1.png",
+        # "future_2.png"
     ]
 }
+
+# 画像を安全に表示する関数
+def show_safe_image(img_path):
+    # URLの場合
+    if img_path.startswith("http"):
+        st.image(img_path, use_container_width=True)
+    # ローカルファイルの場合
+    elif os.path.exists(img_path):
+        st.image(img_path, use_container_width=True)
+    # ファイルが見つからない場合
+    else:
+        st.warning(f"⚠️ 画像が見つかりません: {img_path}")
+        st.caption("app.pyと同じフォルダに画像を置いて、ファイル名を確認してください。")
 
 # ==========================================
 # 2. アプリ設定 & リッチデザインCSS
@@ -76,7 +90,7 @@ st.markdown("""
         margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
     }
     
-    /* タブのカスタマイズ */
+    /* タブ */
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
     .stTabs [data-baseweb="tab"] {
         height: 50px; white-space: pre-wrap;
@@ -281,7 +295,7 @@ def view_login_form():
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ホーム画面（★画像表示機能つき） ---
+# --- ホーム画面（★デコ活ガイドブック実装） ---
 def view_home():
     render_header()
 
@@ -300,16 +314,17 @@ def view_home():
     tab1, tab2, tab3 = st.tabs(["🌱 基本", "🏃 アクション", "🌈 未来"])
 
     with tab1:
+        # ★画像を安全に表示する
         for img in GUIDE_IMAGES["basic"]:
-            st.image(img, use_container_width=True)
+            show_safe_image(img)
             
     with tab2:
         for img in GUIDE_IMAGES["action"]:
-            st.image(img, use_container_width=True)
+            show_safe_image(img)
             
     with tab3:
         for img in GUIDE_IMAGES["future"]:
-            st.image(img, use_container_width=True)
+            show_safe_image(img)
             
     st.markdown('</div>', unsafe_allow_html=True)
 
