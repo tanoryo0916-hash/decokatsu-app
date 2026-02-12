@@ -6,7 +6,28 @@ import random
 from supabase import create_client, Client
 
 # ==========================================
-# 1. アプリ設定 & リッチデザインCSS
+# 1. 画像ファイルの設定 (★ここを書き換えてください)
+# ==========================================
+# 準備した画像ファイル名をここに記述します。
+# アプリのファイル(app.py)と同じ場所に画像を置いてください。
+GUIDE_IMAGES = {
+    "basic": [
+        "https://placehold.co/800x600/E0F2F1/00695C?text=資料1：デコ活ってなに？", 
+        # "guide_basic_1.png",  <-- 本番はこのようにファイル名を書く
+        # "guide_basic_2.png"
+    ],
+    "action": [
+        "https://placehold.co/800x600/FFF3E0/E65100?text=資料2：今日からできるアクション",
+        # "guide_action.png"
+    ],
+    "future": [
+        "https://placehold.co/800x600/E8EAF6/3F51B5?text=資料3：10年後の豊かな暮らし",
+        # "guide_future.png"
+    ]
+}
+
+# ==========================================
+# 2. アプリ設定 & リッチデザインCSS
 # ==========================================
 st.set_page_config(
     page_title="おかやまデコ活チャレンジ2026",
@@ -42,7 +63,7 @@ st.markdown("""
         display: flex; align-items: center; gap: 5px; border: 2px solid #C8E6C9;
     }
 
-    /* --- ★追加: ガイドブック（勉強）ゾーンのデザイン --- */
+    /* --- ガイドブック（画像表示）ゾーン --- */
     .guidebook-box {
         background: white;
         border-radius: 20px;
@@ -55,12 +76,6 @@ st.markdown("""
         font-size: 18px; font-weight: 900; color: #00695C;
         margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
     }
-    .guide-card {
-        background: #E0F2F1; padding: 15px; border-radius: 15px;
-        margin-bottom: 10px; border-left: 5px solid #009688;
-    }
-    .guide-label { font-size: 14px; font-weight: 800; color: #00796B; margin-bottom: 5px; }
-    .guide-text { font-size: 14px; line-height: 1.6; }
     
     /* タブのカスタマイズ */
     .stTabs [data-baseweb="tab-list"] { gap: 5px; }
@@ -124,7 +139,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. データベース接続 & ロジック
+# 3. データベース接続 & ロジック
 # ==========================================
 @st.cache_resource
 def init_connection():
@@ -164,7 +179,7 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
         pass
 
 # ==========================================
-# 3. ステート管理
+# 4. ステート管理
 # ==========================================
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
@@ -174,37 +189,6 @@ if 'game_done' not in st.session_state: st.session_state.game_done = False
 def go_to(page_name):
     st.session_state.page = page_name
     st.rerun()
-
-# ==========================================
-# 4. コンテンツデータ（デコ活資料）
-# ==========================================
-# PDF資料から抽出した内容
-DECO_GUIDE = {
-    "basic": {
-        "title": "デコ活ってなに？",
-        "content": [
-            ("デコ活の名前のヒミツ", "「脱炭素（De）」と「エコ（Eco）」を組み合わせた新しい言葉だよ！"),
-            ("目指していること", "2050年までに、CO2（二酸化炭素）を実質ゼロにする「カーボンニュートラル」を目指しているんだ。"),
-            ("バタフライエフェクト", "ロゴマークは蝶々（ちょうちょ）。一人ひとりの小さな行動が、世界を変える大きな風になるという意味が込められているよ。")
-        ]
-    },
-    "action": {
-        "title": "今日からできること",
-        "content": [
-            ("🏠 おうちで", "・電気をこまめに消す\n・食べ残しをしない\n・ゴミを正しく分ける"),
-            ("🚗 移動するとき", "・近くなら歩いていく\n・自転車や電車バスを使う"),
-            ("👗 お買い物で", "・長く使える服を選ぶ\n・地元の野菜を食べる（地産地消）")
-        ]
-    },
-    "future": {
-        "title": "10年後の豊かな暮らし",
-        "content": [
-            ("💰 お金が貯まる！", "省エネ家電や断熱リフォーム、太陽光発電などで、年間約43万円も節約できるかも！？"),
-            ("⏰ 時間が増える！", "テレワークや自動運転などで、年間約388時間（16日分！）も自由な時間が増えるかも！？"),
-            ("🌡️ 健康になる！", "お家の中が暖かくなると、ヒートショック（急な温度変化で倒れること）を防げるよ。")
-        ]
-    }
-}
 
 # ==========================================
 # 5. 各画面コンポーネント
@@ -298,43 +282,37 @@ def view_login_form():
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ホーム画面（★デコ活ガイドブック実装） ---
+# --- ホーム画面（★画像表示機能つき） ---
 def view_home():
     render_header()
 
-    # --- 📚 デコ活ガイドブック（勉強ゾーン） ---
+    # --- 📚 デコ活ガイドブック（画像表示） ---
     st.markdown("""
     <div class="guidebook-box">
         <div class="guide-title">
             <span style="font-size:24px;">📚</span> デコ活ガイドブック
         </div>
         <div style="font-size:12px; color:#555; margin-bottom:15px;">
-            デコ活ってなに？資料を見て勉強しよう！<br>ここからクイズが出るかも！？
+            資料を見て勉強しよう！ここからクイズが出るかも！？
         </div>
     """, unsafe_allow_html=True)
 
-    # 3つのタブで情報を整理
+    # 3つのタブで画像を切り替え
     tab1, tab2, tab3 = st.tabs(["🌱 基本", "🏃 アクション", "🌈 未来"])
 
     with tab1:
-        data = DECO_GUIDE["basic"]
-        st.caption(f"ー {data['title']}")
-        for q, a in data['content']:
-            st.markdown(f"""<div class="guide-card"><div class="guide-label">{q}</div><div class="guide-text">{a}</div></div>""", unsafe_allow_html=True)
+        for img in GUIDE_IMAGES["basic"]:
+            st.image(img, use_container_width=True)
             
     with tab2:
-        data = DECO_GUIDE["action"]
-        st.caption(f"ー {data['title']}")
-        for q, a in data['content']:
-            st.markdown(f"""<div class="guide-card"><div class="guide-label">{q}</div><div class="guide-text">{a}</div></div>""", unsafe_allow_html=True)
+        for img in GUIDE_IMAGES["action"]:
+            st.image(img, use_container_width=True)
             
     with tab3:
-        data = DECO_GUIDE["future"]
-        st.caption(f"ー {data['title']}")
-        for q, a in data['content']:
-            st.markdown(f"""<div class="guide-card"><div class="guide-label">{q}</div><div class="guide-text">{a}</div></div>""", unsafe_allow_html=True)
+        for img in GUIDE_IMAGES["future"]:
+            st.image(img, use_container_width=True)
             
-    st.markdown('</div>', unsafe_allow_html=True) # close guidebook-box
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # --- デコ活の木 ---
     st.markdown("""
@@ -349,7 +327,6 @@ def view_home():
     </div>
     """, unsafe_allow_html=True)
     
-    # CTAボタン
     st.markdown('<div class="big-action-btn">', unsafe_allow_html=True)
     if st.button("📝 きょうの記録をつける！", use_container_width=True):
         go_to('ACTION')
@@ -357,7 +334,6 @@ def view_home():
     
     st.write("") 
     
-    # メニュー
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
@@ -370,7 +346,7 @@ def view_home():
     with c3:
         st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
         if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True):
-            st.toast("まずはガイドブックで勉強してね！", icon="📖")
+            st.toast("ガイドブックで勉強してね！", icon="📖")
         st.markdown('</div>', unsafe_allow_html=True)
 
 # --- アクション記録画面 ---
