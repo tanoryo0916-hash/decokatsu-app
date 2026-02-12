@@ -10,7 +10,6 @@ from supabase import create_client, Client
 # ==========================================
 # 1. 画像ファイルの設定
 # ==========================================
-# ファイル名はご自身の環境に合わせて変更してください
 GUIDE_IMAGES = {
     "basic": ["basic_1.png", "basic_2.png"],
     "home": ["action_1.png", "action_2.png"],
@@ -20,37 +19,37 @@ GUIDE_IMAGES = {
 }
 
 # ==========================================
-# 2. 画像処理ロジック (横スクロール用)
+# 2. 画像処理ロジック
 # ==========================================
 def get_base64_image(image_path):
-    """画像をBase64文字列に変換する"""
-    if image_path.startswith("http"):
-        return image_path # URLならそのまま返す
-    
-    if not os.path.exists(image_path):
-        return None # ファイルがない場合
-        
+    if image_path.startswith("http"): return image_path
+    if not os.path.exists(image_path): return None
     with open(image_path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode()
 
 def render_horizontal_gallery(image_list):
-    """画像を横スクロールコンテナで表示する"""
     html_content = '<div class="scroll-container">'
-    
     for img_path in image_list:
         img_data = get_base64_image(img_path)
-        
         if img_data:
-            # Base64かURLかでsrcの書き方を変える
             src = img_data if img_path.startswith("http") else f"data:image/png;base64,{img_data}"
             html_content += f'<img src="{src}" class="scroll-item" />'
         else:
-            # 画像がない場合のプレースホルダ（ダミー画像）
             dummy_url = f"https://placehold.co/600x400/E0F2F1/00695C?text={os.path.basename(img_path)}"
             html_content += f'<img src="{dummy_url}" class="scroll-item" />'
-            
     html_content += '</div>'
     st.markdown(html_content, unsafe_allow_html=True)
+
+def show_safe_image(img_path):
+    try:
+        if img_path.startswith("http"):
+            st.image(img_path, use_container_width=True)
+        elif os.path.exists(img_path):
+            st.image(img_path, use_container_width=True)
+        else:
+            st.warning(f"⚠️ 画像が見つかりません: {img_path}")
+    except Exception:
+        st.error("画像読み込みエラー")
 
 # ==========================================
 # 3. アプリ設定 & デザインCSS
@@ -72,7 +71,7 @@ st.markdown("""
         color: #37474F;
     }
 
-    /* --- ヘッダー --- */
+    /* ヘッダー */
     .header-container {
         background: white; padding: 15px 20px; border-radius: 0 0 30px 30px;
         box-shadow: 0 10px 20px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;
@@ -85,36 +84,24 @@ st.markdown("""
         display: flex; align-items: center; gap: 5px; border: 2px solid #C8E6C9;
     }
 
-    /* --- ★横スクロールギャラリーのCSS --- */
+    /* 横スクロールギャラリー */
     .scroll-container {
-        display: flex;
-        overflow-x: auto;
-        gap: 15px;
-        padding: 10px 5px 20px 5px; /* 下にスクロールバー用の余白 */
-        scrollbar-width: thin; /* Firefox用 */
-        scrollbar-color: #C8E6C9 transparent;
+        display: flex; overflow-x: auto; gap: 15px; padding: 10px 5px 20px 5px;
+        scrollbar-width: thin; scrollbar-color: #C8E6C9 transparent;
     }
-    /* Webkit (Chrome, Safari) 用スクロールバー装飾 */
     .scroll-container::-webkit-scrollbar { height: 8px; }
-    .scroll-container::-webkit-scrollbar-track { background: transparent; }
     .scroll-container::-webkit-scrollbar-thumb { background-color: #C8E6C9; border-radius: 10px; }
-    
     .scroll-item {
-        height: 250px; /* 画像の高さ固定 */
-        width: auto;   /* 幅は比率維持 */
-        border-radius: 15px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        flex-shrink: 0; /* 縮小させない */
-        border: 2px solid #fff;
+        height: 250px; width: auto; border-radius: 15px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0; border: 2px solid #fff;
         transition: transform 0.2s;
     }
     .scroll-item:hover { transform: scale(1.02); }
 
-    /* ガイドブックボックス */
+    /* ガイドブック */
     .guidebook-box {
         background: white; border-radius: 20px; padding: 20px;
-        margin-bottom: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        border: 2px solid #E0F2F1;
+        margin-bottom: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 2px solid #E0F2F1;
     }
     .guide-title {
         font-size: 18px; font-weight: 900; color: #00695C;
@@ -130,7 +117,7 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #fff; color: #2E7D32; border-top: 3px solid #2E7D32; }
 
-    /* ボタン類 */
+    /* ボタン */
     .big-action-btn button {
         background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 100%) !important;
         color: white !important; height: 90px !important; border-radius: 30px !important;
@@ -172,10 +159,12 @@ st.markdown("""
     .rank-1 { border-color: #FFD700; background: linear-gradient(to right, #FFFDE7, #FFF); }
     .medal { font-size: 32px; width: 50px; text-align: center; margin-right: 15px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
 
-    /* Streamlit標準要素調整 */
     .stRadio>div { background: white; padding: 15px; border-radius: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); gap: 10px; }
     div[data-baseweb="input"] { border-radius: 15px; border: 2px solid #E0E0E0; }
     div[data-baseweb="select"]>div { border-radius: 15px; border: 2px solid #E0E0E0; }
+    
+    /* アクション説明の文字サイズ調整 */
+    .act-desc { font-size: 12px; color: #607D8B; margin-top: 2px; line-height: 1.4; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -311,40 +300,31 @@ def view_login_form():
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ホーム画面（★横スクロールギャラリー実装） ---
+# --- ホーム画面 ---
 def view_home():
     render_header()
 
-    # --- 📚 デコ活ガイドブック ---
+    # ガイドブック
     st.markdown("""
     <div class="guidebook-box">
-        <div class="guide-title">
-            <span style="font-size:24px;">📚</span> デコ活ガイドブック
-        </div>
-        <div style="font-size:12px; color:#555; margin-bottom:15px;">
-            画像を見て勉強しよう！横にスクロールできるよ ➡️
-        </div>
+        <div class="guide-title"><span style="font-size:24px;">📚</span> デコ活ガイドブック</div>
+        <div style="font-size:12px; color:#555; margin-bottom:15px;">画像を見て勉強しよう！横にスクロールできるよ ➡️</div>
     """, unsafe_allow_html=True)
 
-    # 5つのタブを作成
     tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌱 基本", "🏠 おうち", "🍽️ くらし", "🚗 移動", "🌈 未来"])
-
-    # ★画像を横スクロールコンテナで描画
     with tab1: render_horizontal_gallery(GUIDE_IMAGES["basic"])
     with tab2: render_horizontal_gallery(GUIDE_IMAGES["home"])
     with tab3: render_horizontal_gallery(GUIDE_IMAGES["living"])
     with tab4: render_horizontal_gallery(GUIDE_IMAGES["move"])
     with tab5: render_horizontal_gallery(GUIDE_IMAGES["future"])
-            
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- デコ活の木 ---
+    # デコ活の木
     st.markdown("""
     <div style="text-align:center; position:relative; margin-bottom:30px; margin-top:10px;">
         <div style="font-size:160px; line-height:1; filter: drop-shadow(0 15px 15px rgba(0,100,0,0.2)); z-index:2; position:relative;">🌳</div>
         <div style="position:absolute; top:40px; left:10px; font-size:50px; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2)); animation: bounce 2s infinite;">🦌</div>
         <div style="position:absolute; top:80px; right:20px; font-size:40px; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));">🐿️</div>
-        
         <div style="background:white; border:4px solid #4CAF50; border-radius:50px; padding:12px 25px; display:inline-block; font-weight:900; color:#1B5E20; box-shadow:0 8px 15px rgba(0,0,0,0.1); position:relative; top:-20px; z-index:5;">
             みんなの削減量: 123,456 kg
         </div>
@@ -373,7 +353,7 @@ def view_home():
             st.toast("ガイドブックで勉強してね！", icon="📖")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- アクション記録画面 ---
+# --- ★アクション記録画面 (更新版) ---
 def view_action():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
@@ -383,34 +363,63 @@ def view_action():
     selected = st.radio(" ", days, horizontal=True, label_visibility="collapsed")
     st.info(f"【{selected}】 できたこと全部にチェック！")
     
+    # データを定義 (具体的な説明と削減量を追加)
     acts = [
-        ("💡", "電気をこまめに消した", 50, "elec"),
-        ("🍚", "ご飯を残さず食べた", 100, "food"),
-        ("💧", "水を大切に使った", 30, "water"),
-        ("♻️", "ゴミを正しく分けた", 80, "sort"),
-        ("👨‍👩‍👧", "おうちの人も一緒にできた", 50, "family")
+        {
+            "id": "elec", "icon": "💡", "pt": 50,
+            "title": "だれもいない へやの でんき をけした！",
+            "desc": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"
+        },
+        {
+            "id": "food", "icon": "🍚", "pt": 100,
+            "title": "ごはんを のこさず たべた！",
+            "desc": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"
+        },
+        {
+            "id": "water", "icon": "🚰", "pt": 30,
+            "title": "水（みず）を 大切（たいせつ）に つかった！",
+            "desc": "例：歯みがきの間コップを使って水を止めた、顔を洗うとき出しっぱなしにしなかった（CO2削減 -30g）"
+        },
+        {
+            "id": "sort", "icon": "♻️", "pt": 80,
+            "title": "ゴミを 正（ただ）しく わけた！",
+            "desc": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"
+        },
+        {
+            "id": "family", "icon": "👨‍👩‍👧", "pt": 50,
+            "title": "おうちの 人（ひと）も いっしょに できた！",
+            "desc": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"
+        }
     ]
     
     completed_today = st.session_state.action_log.get(selected, [])
     
-    for icon, label, pt, act_id in acts:
+    for act in acts:
         with st.container():
-            c_icon, c_lbl, c_btn = st.columns([1, 4, 2])
-            with c_icon: st.markdown(f"<div style='font-size:36px; text-align:center'>{icon}</div>", unsafe_allow_html=True)
-            with c_lbl: st.markdown(f"<div style='font-weight:bold; font-size:18px; margin-top:5px;'>{label}</div>", unsafe_allow_html=True)
+            c_icon, c_content, c_btn = st.columns([1, 4, 2])
+            
+            with c_icon: 
+                st.markdown(f"<div style='font-size:36px; text-align:center'>{act['icon']}</div>", unsafe_allow_html=True)
+            
+            with c_content:
+                st.markdown(f"<div style='font-weight:bold; font-size:16px; margin-top:5px;'>{act['title']}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='act-desc'>{act['desc']}</div>", unsafe_allow_html=True)
+                
             with c_btn:
-                if act_id in completed_today:
-                    st.button(f"✅ 達成済", key=f"done_{selected}_{act_id}", disabled=True, use_container_width=True)
+                # ボタン（縦幅を埋めるためにスタイル調整）
+                st.write("") # スペーサー
+                if act['id'] in completed_today:
+                    st.button(f"✅ 達成済", key=f"done_{selected}_{act['id']}", disabled=True, use_container_width=True)
                 else:
-                    if st.button(f"できた! (+{pt})", key=f"{selected}_{act_id}", use_container_width=True):
+                    if st.button(f"できた! (+{act['pt']})", key=f"{selected}_{act['id']}", use_container_width=True):
                         if selected not in st.session_state.action_log:
                             st.session_state.action_log[selected] = []
-                        st.session_state.action_log[selected].append(act_id)
+                        st.session_state.action_log[selected].append(act['id'])
                         
                         new_actions = st.session_state.action_log[selected]
                         total_pts = len(new_actions) * 50 
                         sync_action_to_db(st.session_state.user['id'], selected, new_actions, total_pts)
-                        st.toast(f"ナイス！ {pt}ポイントゲット！", icon="🎉")
+                        st.toast(f"ナイス！ {act['pt']}ポイントゲット！", icon="🎉")
                         st.balloons()
                         st.rerun()
             st.markdown("---") 
