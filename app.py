@@ -26,19 +26,27 @@ GUIDE_IMAGES = {
     ]
 }
 
-# 画像を安全に表示する関数
+# ==========================================
+# 画像を安全に表示する関数（修正版）
+# ==========================================
 def show_safe_image(img_path):
-    # URLの場合
-    if img_path.startswith("http"):
-        st.image(img_path, use_container_width=True)
-    # ローカルファイルの場合
-    elif os.path.exists(img_path):
-        st.image(img_path, use_container_width=True)
-    # ファイルが見つからない場合
-    else:
-        st.warning(f"⚠️ 画像が見つかりません: {img_path}")
-        st.caption("app.pyと同じフォルダに画像を置いて、ファイル名を確認してください。")
-
+    try:
+        # URLの場合
+        if img_path.startswith("http"):
+            st.image(img_path, use_container_width=True)
+        # ローカルファイルが存在する場合
+        elif os.path.exists(img_path):
+            st.image(img_path, use_container_width=True)
+        # ファイルが見つからない場合
+        else:
+            st.warning(f"⚠️ 画像が見つかりません: {img_path}")
+            st.caption("ファイル名が間違っていないか、app.pyと同じ場所にあるか確認してください。")
+            
+    except Exception as e:
+        # 画像ファイルが壊れている場合などのエラー回避
+        st.error(f"⚠️ 画像を読み込めませんでした: {img_path}")
+        st.caption("ファイルが破損しているか、画像形式ではない可能性があります。")
+        
 # ==========================================
 # 2. アプリ設定 & リッチデザインCSS
 # ==========================================
