@@ -12,13 +12,13 @@ from supabase import create_client, Client
 # ==========================================
 # 参加率計算用の「全校児童数」定義 (デモ用)
 SCHOOL_POPULATION = {
-    "倉敷第一小学校": 500,
-    "岡山中央小学校": 450,
-    "津山東小学校": 300,
-    "伊島小学校": 600
+    "倉敷第一": 500,
+    "岡山中央": 450,
+    "津山東": 300,
+    "伊島": 600
 }
 
-# ガイドブック画像設定 (ファイル名を指定)
+# ガイドブック画像設定
 GUIDE_IMAGES = {
     "basic": ["basic_1.png", "basic_2.png"],
     "home": ["action_1.png", "action_2.png"],
@@ -127,6 +127,12 @@ st.markdown("""
     .stRadio>div { background: white; padding: 15px; border-radius: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); gap: 10px; }
     div[data-baseweb="input"] { border-radius: 15px; border: 2px solid #E0E0E0; }
     div[data-baseweb="select"]>div { border-radius: 15px; border: 2px solid #E0E0E0; }
+    
+    /* 学校名の「小学校」ラベル */
+    .school-suffix { 
+        font-size: 18px; font-weight: bold; color: #555; 
+        display: flex; align-items: center; height: 100%; padding-top: 25px; 
+    }
     .act-desc { font-size: 12px; color: #607D8B; margin-top: 2px; line-height: 1.4; }
     
     /* 横スクロール */
@@ -310,21 +316,31 @@ def view_login_entry():
         if st.button("🏫\n先生", key="l_tea", use_container_width=True): st.session_state.temp_role = "teacher"; go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
 
+# --- ★修正: ログインフォーム（小学校固定表示＆記憶） ---
 def view_login_form():
     role = st.session_state.temp_role
     st.markdown(f"<div style='text-align:center; margin-bottom:20px;'><h3 style='font-weight:900;'>情報を入力してね</h3><span style='background:#ECEFF1; padding:5px 15px; border-radius:15px; font-weight:bold;'>{role.upper()}</span></div>", unsafe_allow_html=True)
     with st.form("login"):
         if role in ["student", "family"]:
             st.info("※ 同じ「学校・組・番号」を使えるのは1人だけだよ！")
+            
+            # 前回の値を復元
             qp = st.query_params
-            school = st.text_input("小学校名", value=qp.get("sch", ""), placeholder="例：倉敷")
+            
+            # --- ★学校名入力欄の工夫 ---
+            col_s1, col_s2 = st.columns([3, 1])
+            school = col_s1.text_input("小学校名", value=qp.get("sch", ""), placeholder="例：倉敷")
+            col_s2.markdown('<div class="school-suffix">小学校</div>', unsafe_allow_html=True)
+            
             c1, c2, c3 = st.columns(3)
             grade = c1.text_input("学年", value=qp.get("grd", ""), placeholder="5")
             u_class = c2.text_input("組", value=qp.get("cls", ""), placeholder="1")
             num = c3.text_input("番号", value=qp.get("num", ""), placeholder="15")
+            
             st.markdown("---")
             st.caption("📌 2回目からは同じニックネームを入れてね")
             name = st.text_input("ニックネーム", placeholder="ももたろう")
+            
             if st.form_submit_button("🚀 スタート！", type="primary"):
                 if not school or not grade or not u_class or not num or not name:
                     st.error("⚠️ 全部入力してね！")
@@ -334,6 +350,7 @@ def view_login_form():
                     if is_ok:
                         st.session_state.user = u_data
                         st.session_state.action_log = load_user_data(user_id)
+                        # ★記憶機能: パラメータ保存
                         st.query_params["sch"] = school
                         st.query_params["grd"] = grade
                         st.query_params["cls"] = u_class
@@ -418,6 +435,7 @@ def view_action():
         st.markdown("---"); st.success("🎓 全ミッション終了！")
         if st.button("🏆 認定証", use_container_width=True): st.balloons(); st.image("https://placehold.co/600x400/FFF/D4AF37?text=CERTIFICATE")
 
+# --- ★修正: ランキング画面（学校名に「小学校」を付与） ---
 def view_ranking():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
@@ -425,18 +443,22 @@ def view_ranking():
     school_avg, class_rank, part_rank, game_rank = fetch_all_rankings()
     t1, t2, t3, t4 = st.tabs(["🏫 学校(平均)", "🏢 クラス", "📈 参加率", "🎮 ゲーム"])
     
+    # 学校名フォーマット関数
+    def fmt_school(name):
+        return f"{name}小学校" if "小学校" not in name else name
+
     with t1:
-        st.caption("一人あたりの削減量")
+        st.caption("一人あたりのCO2削減量 (g)")
         if not school_avg.empty:
             for i, (school, score) in enumerate(school_avg.items()):
                 rank = i + 1
                 color = f"rank-{rank}" if rank <= 3 else ""
-                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{school}</div><div class="rank-score"><span class="score-val">{int(score)}</span>g</div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{fmt_school(school)}</div><div class="rank-score"><span class="score-val">{int(score)}</span>g</div></div>', unsafe_allow_html=True)
         else: st.info("集計中...")
         
     with t2:
         my_school = st.session_state.user['group'].split(' ')[0]
-        st.caption(f"{my_school} のクラス対抗")
+        st.caption(f"{fmt_school(my_school)} のクラス対抗")
         if my_school in class_rank:
             for i, (cls, score) in enumerate(class_rank[my_school].items()):
                 rank = i + 1
@@ -450,7 +472,7 @@ def view_ranking():
             for i, (school, rate) in enumerate(part_rank.items()):
                 rank = i + 1
                 color = f"rank-{rank}" if rank <= 3 else ""
-                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{school}</div><div class="rank-score"><span class="score-val">{rate:.1f}%</span></div></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{fmt_school(school)}</div><div class="rank-score"><span class="score-val">{rate:.1f}%</span></div></div>', unsafe_allow_html=True)
 
     with t4:
         st.caption("ゲームタイムランキング")
@@ -458,8 +480,9 @@ def view_ranking():
             for i, r in enumerate(game_rank):
                 rank = i + 1
                 color = f"rank-{rank}" if rank <= 3 else ""
-                p_name = r.get('nickname', '名無し')
-                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;"><div style="font-weight:bold;">{p_name}</div><div style="font-size:10px;">{r["school"]}</div></div><div class="rank-score"><span class="score-val">{r["time"]}</span>秒</div></div>', unsafe_allow_html=True)
+                p_name = r.get('nickname', r.get('name', '名無し'))
+                p_sch = r.get('school', '')
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;"><div style="font-weight:bold;">{p_name}</div><div style="font-size:10px;">{fmt_school(p_sch)}</div></div><div class="rank-score"><span class="score-val">{r.get("time",0)}</span>秒</div></div>', unsafe_allow_html=True)
 
 def view_game():
     render_header()
