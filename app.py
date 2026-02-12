@@ -3,51 +3,57 @@ import pandas as pd
 import datetime
 import time
 import random
-import os  # ★追加：ファイルの存在確認用
+import os
+import base64
 from supabase import create_client, Client
 
 # ==========================================
 # 1. 画像ファイルの設定
 # ==========================================
-# ★ここに、あなたが用意した画像ファイル名を書いてください。
-# ※ファイルは app.py と同じフォルダに置いてください。
+# ファイル名はご自身の環境に合わせて変更してください
 GUIDE_IMAGES = {
-    "basic": [
-        "decokatsu_panel_ver03_page-0001.jpg",  # 例: 1枚目の画像
-    ],
-    "action": [
-        "decokatsu_panel_ver03_page-0002.jpg",
-        # "action_2.jpg"
-    ],
-    "future": [
-        "decokatsu_panel_ver03_page-0003.jpg",
-        # "future_2.jpg"
-    ]
+    "basic": ["basic_1.png", "basic_2.png"],
+    "home": ["action_1.png", "action_2.png"],
+    "living": ["action_3.png", "action_4.png", "action_5.png"],
+    "move": ["action_6.png", "action_7.png"],
+    "future": ["future_1.png", "future_2.png"]
 }
 
 # ==========================================
-# 画像を安全に表示する関数（修正版）
+# 2. 画像処理ロジック (横スクロール用)
 # ==========================================
-def show_safe_image(img_path):
-    try:
-        # URLの場合
-        if img_path.startswith("http"):
-            st.image(img_path, use_container_width=True)
-        # ローカルファイルが存在する場合
-        elif os.path.exists(img_path):
-            st.image(img_path, use_container_width=True)
-        # ファイルが見つからない場合
-        else:
-            st.warning(f"⚠️ 画像が見つかりません: {img_path}")
-            st.caption("ファイル名が間違っていないか、app.pyと同じ場所にあるか確認してください。")
-            
-    except Exception as e:
-        # 画像ファイルが壊れている場合などのエラー回避
-        st.error(f"⚠️ 画像を読み込めませんでした: {img_path}")
-        st.caption("ファイルが破損しているか、画像形式ではない可能性があります。")
+def get_base64_image(image_path):
+    """画像をBase64文字列に変換する"""
+    if image_path.startswith("http"):
+        return image_path # URLならそのまま返す
+    
+    if not os.path.exists(image_path):
+        return None # ファイルがない場合
         
+    with open(image_path, "rb") as img_file:
+        return base64.b64encode(img_file.read()).decode()
+
+def render_horizontal_gallery(image_list):
+    """画像を横スクロールコンテナで表示する"""
+    html_content = '<div class="scroll-container">'
+    
+    for img_path in image_list:
+        img_data = get_base64_image(img_path)
+        
+        if img_data:
+            # Base64かURLかでsrcの書き方を変える
+            src = img_data if img_path.startswith("http") else f"data:image/png;base64,{img_data}"
+            html_content += f'<img src="{src}" class="scroll-item" />'
+        else:
+            # 画像がない場合のプレースホルダ（ダミー画像）
+            dummy_url = f"https://placehold.co/600x400/E0F2F1/00695C?text={os.path.basename(img_path)}"
+            html_content += f'<img src="{dummy_url}" class="scroll-item" />'
+            
+    html_content += '</div>'
+    st.markdown(html_content, unsafe_allow_html=True)
+
 # ==========================================
-# 2. アプリ設定 & リッチデザインCSS
+# 3. アプリ設定 & デザインCSS
 # ==========================================
 st.set_page_config(
     page_title="おかやまデコ活チャレンジ2026",
@@ -56,7 +62,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 🎨 UIデザインCSS
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;800;900&display=swap');
@@ -69,11 +74,8 @@ st.markdown("""
 
     /* --- ヘッダー --- */
     .header-container {
-        background: white;
-        padding: 15px 20px;
-        border-radius: 0 0 30px 30px;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.05);
-        display: flex; justify-content: space-between; align-items: center;
+        background: white; padding: 15px 20px; border-radius: 0 0 30px 30px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center;
         margin-bottom: 20px; border-bottom: 4px solid #C8E6C9;
     }
     .app-name { font-size: 20px; font-weight: 900; color: #2E7D32; line-height: 1.2; }
@@ -83,13 +85,35 @@ st.markdown("""
         display: flex; align-items: center; gap: 5px; border: 2px solid #C8E6C9;
     }
 
-    /* --- ガイドブック（画像表示）ゾーン --- */
+    /* --- ★横スクロールギャラリーのCSS --- */
+    .scroll-container {
+        display: flex;
+        overflow-x: auto;
+        gap: 15px;
+        padding: 10px 5px 20px 5px; /* 下にスクロールバー用の余白 */
+        scrollbar-width: thin; /* Firefox用 */
+        scrollbar-color: #C8E6C9 transparent;
+    }
+    /* Webkit (Chrome, Safari) 用スクロールバー装飾 */
+    .scroll-container::-webkit-scrollbar { height: 8px; }
+    .scroll-container::-webkit-scrollbar-track { background: transparent; }
+    .scroll-container::-webkit-scrollbar-thumb { background-color: #C8E6C9; border-radius: 10px; }
+    
+    .scroll-item {
+        height: 250px; /* 画像の高さ固定 */
+        width: auto;   /* 幅は比率維持 */
+        border-radius: 15px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        flex-shrink: 0; /* 縮小させない */
+        border: 2px solid #fff;
+        transition: transform 0.2s;
+    }
+    .scroll-item:hover { transform: scale(1.02); }
+
+    /* ガイドブックボックス */
     .guidebook-box {
-        background: white;
-        border-radius: 20px;
-        padding: 20px;
-        margin-bottom: 30px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        background: white; border-radius: 20px; padding: 20px;
+        margin-bottom: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         border: 2px solid #E0F2F1;
     }
     .guide-title {
@@ -98,15 +122,15 @@ st.markdown("""
     }
     
     /* タブ */
-    .stTabs [data-baseweb="tab-list"] { gap: 5px; }
+    .stTabs [data-baseweb="tab-list"] { gap: 4px; overflow-x: auto; flex-wrap: nowrap; }
     .stTabs [data-baseweb="tab"] {
-        height: 50px; white-space: pre-wrap;
-        background-color: #F1F8E9; border-radius: 10px 10px 0 0;
-        gap: 1px; padding-top: 10px; padding-bottom: 10px;
+        height: 45px; white-space: nowrap; padding: 0 15px;
+        background-color: #F1F8E9; border-radius: 15px 15px 0 0;
+        font-weight: bold; font-size: 12px; border: none;
     }
     .stTabs [aria-selected="true"] { background-color: #fff; color: #2E7D32; border-top: 3px solid #2E7D32; }
 
-    /* --- ボタン --- */
+    /* ボタン類 */
     .big-action-btn button {
         background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 100%) !important;
         color: white !important; height: 90px !important; border-radius: 30px !important;
@@ -115,10 +139,7 @@ st.markdown("""
         border: none !important; margin-bottom: 10px !important;
         transition: transform 0.1s, box-shadow 0.1s !important;
     }
-    .big-action-btn button:active { 
-        transform: translateY(10px) !important; 
-        box-shadow: 0 0 0 #E65100, 0 0 0 rgba(0,0,0,0) !important;
-    }
+    .big-action-btn button:active { transform: translateY(10px) !important; box-shadow: none !important; }
 
     .menu-btn button {
         background: white !important; color: #455A64 !important; height: 120px !important;
@@ -128,7 +149,7 @@ st.markdown("""
         display: flex; flex-direction: column; justify-content: center; align-items: center;
         transition: transform 0.1s !important;
     }
-    .menu-btn button:active { transform: translateY(6px) !important; box-shadow: 0 0 0 #CFD8DC !important; }
+    .menu-btn button:active { transform: translateY(6px) !important; box-shadow: none !important; }
 
     .login-btn button {
         height: 150px !important; border-radius: 30px !important; color: white !important;
@@ -151,15 +172,15 @@ st.markdown("""
     .rank-1 { border-color: #FFD700; background: linear-gradient(to right, #FFFDE7, #FFF); }
     .medal { font-size: 32px; width: 50px; text-align: center; margin-right: 15px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
 
+    /* Streamlit標準要素調整 */
     .stRadio>div { background: white; padding: 15px; border-radius: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); gap: 10px; }
     div[data-baseweb="input"] { border-radius: 15px; border: 2px solid #E0E0E0; }
     div[data-baseweb="select"]>div { border-radius: 15px; border: 2px solid #E0E0E0; }
-
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. データベース接続 & ロジック
+# 4. データベース接続 & ロジック
 # ==========================================
 @st.cache_resource
 def init_connection():
@@ -172,7 +193,6 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- DB操作関数 ---
 def load_user_data(user_id):
     if not supabase: return {}
     try:
@@ -188,10 +208,7 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
     if not supabase: return
     try:
         data = {
-            "user_id": user_id,
-            "date": date,
-            "actions": actions_list,
-            "points": total_points,
+            "user_id": user_id, "date": date, "actions": actions_list, "points": total_points,
             "updated_at": datetime.datetime.now().isoformat()
         }
         supabase.table("decokatsu_logs").upsert(data).execute()
@@ -199,7 +216,7 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
         pass
 
 # ==========================================
-# 4. ステート管理
+# 5. ステート管理
 # ==========================================
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
@@ -211,7 +228,7 @@ def go_to(page_name):
     st.rerun()
 
 # ==========================================
-# 5. 各画面コンポーネント
+# 6. 各画面コンポーネント
 # ==========================================
 
 # --- ヘッダー ---
@@ -278,60 +295,46 @@ def view_login_form():
             u_class = c2.text_input("組", "1")
             num = c3.number_input("番号", 1, 50)
             name = st.text_input("ニックネーム", "ももたろう")
-            
             if st.form_submit_button("🚀 スタート！", type="primary"):
                 user_id = f"{school}_{grade}_{u_class}_{num}"
-                st.session_state.user = {
-                    "id": user_id,
-                    "name": name, "role": role, "group": f"{school} {grade}-{u_class}"
-                }
+                st.session_state.user = {"id": user_id, "name": name, "role": role, "group": f"{school} {grade}-{u_class}"}
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
-                
         else: # JC or Teacher
             org_label = "所属LOM" if role == "jc" else "担当クラス"
             org_opts = ["岡山JC", "倉敷JC", "津山JC"] if role == "jc" else ["5年2組", "6年1組"]
             org = st.selectbox(org_label, org_opts)
             name = st.text_input("氏名")
-            
             if st.form_submit_button("🔥 ログイン", type="primary"):
                 user_id = f"{role}_{name}"
-                st.session_state.user = {
-                    "id": user_id, "name": name, "role": role, "group": org
-                }
+                st.session_state.user = {"id": user_id, "name": name, "role": role, "group": org}
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ホーム画面（★デコ活ガイドブック実装） ---
+# --- ホーム画面（★横スクロールギャラリー実装） ---
 def view_home():
     render_header()
 
-    # --- 📚 デコ活ガイドブック（画像表示） ---
+    # --- 📚 デコ活ガイドブック ---
     st.markdown("""
     <div class="guidebook-box">
         <div class="guide-title">
             <span style="font-size:24px;">📚</span> デコ活ガイドブック
         </div>
         <div style="font-size:12px; color:#555; margin-bottom:15px;">
-            資料を見て勉強しよう！ここからクイズが出るかも！？
+            画像を見て勉強しよう！横にスクロールできるよ ➡️
         </div>
     """, unsafe_allow_html=True)
 
-    # 3つのタブで画像を切り替え
-    tab1, tab2, tab3 = st.tabs(["🌱 基本", "🏃 アクション", "🌈 未来"])
+    # 5つのタブを作成
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌱 基本", "🏠 おうち", "🍽️ くらし", "🚗 移動", "🌈 未来"])
 
-    with tab1:
-        # ★画像を安全に表示する
-        for img in GUIDE_IMAGES["basic"]:
-            show_safe_image(img)
-            
-    with tab2:
-        for img in GUIDE_IMAGES["action"]:
-            show_safe_image(img)
-            
-    with tab3:
-        for img in GUIDE_IMAGES["future"]:
-            show_safe_image(img)
+    # ★画像を横スクロールコンテナで描画
+    with tab1: render_horizontal_gallery(GUIDE_IMAGES["basic"])
+    with tab2: render_horizontal_gallery(GUIDE_IMAGES["home"])
+    with tab3: render_horizontal_gallery(GUIDE_IMAGES["living"])
+    with tab4: render_horizontal_gallery(GUIDE_IMAGES["move"])
+    with tab5: render_horizontal_gallery(GUIDE_IMAGES["future"])
             
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -376,10 +379,8 @@ def view_action():
     if st.button("🏠 ホームに戻る"): go_to('HOME')
     
     st.markdown("<h3 style='text-align:center; font-weight:900; margin:20px 0;'>📅 日付を選んでね</h3>", unsafe_allow_html=True)
-    
     days = ["6/1(月)", "6/2(火)", "6/3(水)", "6/4(木)", "6/5(金)"]
     selected = st.radio(" ", days, horizontal=True, label_visibility="collapsed")
-    
     st.info(f"【{selected}】 できたこと全部にチェック！")
     
     acts = [
@@ -409,7 +410,6 @@ def view_action():
                         new_actions = st.session_state.action_log[selected]
                         total_pts = len(new_actions) * 50 
                         sync_action_to_db(st.session_state.user['id'], selected, new_actions, total_pts)
-                        
                         st.toast(f"ナイス！ {pt}ポイントゲット！", icon="🎉")
                         st.balloons()
                         st.rerun()
@@ -533,7 +533,7 @@ def view_game():
             st.session_state.game_state = 'READY' 
 
 # ==========================================
-# 6. メインルーティング
+# 7. メインルーティング
 # ==========================================
 if __name__ == "__main__":
     p = st.session_state.page
