@@ -8,8 +8,17 @@ import base64
 from supabase import create_client, Client
 
 # ==========================================
-# 1. 画像ファイルの設定
+# 1. 定数・設定
 # ==========================================
+# 参加率計算用の「全校児童数」定義 (デモ用)
+SCHOOL_POPULATION = {
+    "倉敷第一小学校": 500,
+    "岡山中央小学校": 450,
+    "津山東小学校": 300,
+    "伊島小学校": 600
+}
+
+# ガイドブック画像
 GUIDE_IMAGES = {
     "basic": ["basic_1.png", "basic_2.png"],
     "home": ["action_1.png", "action_2.png"],
@@ -51,30 +60,29 @@ st.markdown("""
         display: flex; align-items: center; gap: 5px; border: 2px solid #C8E6C9;
     }
 
-    /* 横スクロールギャラリー */
-    .scroll-container {
-        display: flex; overflow-x: auto; gap: 15px; padding: 10px 5px 20px 5px;
-        scrollbar-width: thin; scrollbar-color: #C8E6C9 transparent;
+    /* ランキングカード */
+    .rank-card {
+        background: white; border-radius: 20px; padding: 15px 20px; margin-bottom: 15px;
+        display: flex; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        border: 2px solid transparent; transition: transform 0.2s; position: relative;
     }
-    .scroll-container::-webkit-scrollbar { height: 8px; }
-    .scroll-container::-webkit-scrollbar-thumb { background-color: #C8E6C9; border-radius: 10px; }
-    .scroll-item {
-        height: 250px; width: auto; border-radius: 15px;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0; border: 2px solid #fff;
-        transition: transform 0.2s;
-    }
-    .scroll-item:hover { transform: scale(1.02); }
-
-    /* ガイドブック */
-    .guidebook-box {
-        background: white; border-radius: 20px; padding: 20px;
-        margin-bottom: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border: 2px solid #E0F2F1;
-    }
-    .guide-title {
-        font-size: 18px; font-weight: 900; color: #00695C;
-        margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
-    }
+    .rank-1 { border-color: #FFD700; background: linear-gradient(to right, #FFFDE7, #FFF); }
+    .rank-2 { border-color: #C0C0C0; }
+    .rank-3 { border-color: #CD7F32; }
     
+    .medal { 
+        font-size: 32px; width: 50px; text-align: center; margin-right: 15px; 
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); 
+    }
+    .rank-num {
+        font-size: 20px; font-weight: 900; color: #555; width: 40px; text-align: center; margin-right: 10px;
+    }
+    .rank-score {
+        text-align: right; margin-left: auto;
+    }
+    .score-val { color: #2E7D32; font-weight: 900; font-size: 20px; }
+    .score-label { font-size: 10px; font-weight: bold; color: #777; display: block;}
+
     /* タブ */
     .stTabs [data-baseweb="tab-list"] { gap: 4px; overflow-x: auto; flex-wrap: nowrap; }
     .stTabs [data-baseweb="tab"] {
@@ -84,7 +92,7 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #fff; color: #2E7D32; border-top: 3px solid #2E7D32; }
 
-    /* ボタン */
+    /* その他UI要素 */
     .big-action-btn button {
         background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 100%) !important;
         color: white !important; height: 90px !important; border-radius: 30px !important;
@@ -118,19 +126,22 @@ st.markdown("""
     .btn-yellow button { background: linear-gradient(135deg, #FFB300, #FFCA28) !important; color: #5D4037 !important; text-shadow:none !important; }
     .btn-purple button { background: linear-gradient(135deg, #8E24AA, #AB47BC) !important; }
 
-    .rank-card {
-        background: white; border-radius: 20px; padding: 15px 20px; margin-bottom: 15px;
-        display: flex; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
-        border: 2px solid transparent; transition: transform 0.2s;
-    }
-    .rank-1 { border-color: #FFD700; background: linear-gradient(to right, #FFFDE7, #FFF); }
-    .medal { font-size: 32px; width: 50px; text-align: center; margin-right: 15px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
-
     .stRadio>div { background: white; padding: 15px; border-radius: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); gap: 10px; }
     div[data-baseweb="input"] { border-radius: 15px; border: 2px solid #E0E0E0; }
     div[data-baseweb="select"]>div { border-radius: 15px; border: 2px solid #E0E0E0; }
-    
     .act-desc { font-size: 12px; color: #607D8B; margin-top: 2px; line-height: 1.4; }
+    
+    /* 横スクロール */
+    .scroll-container {
+        display: flex; overflow-x: auto; gap: 15px; padding: 10px 5px 20px 5px;
+        scrollbar-width: thin; scrollbar-color: #C8E6C9 transparent;
+    }
+    .scroll-item {
+        height: 250px; width: auto; border-radius: 15px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); flex-shrink: 0; border: 2px solid #fff;
+    }
+    .guidebook-box { background: white; border-radius: 20px; padding: 20px; margin-bottom: 30px; border: 2px solid #E0F2F1; }
+    .guide-title { font-size: 18px; font-weight: 900; color: #00695C; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -148,7 +159,7 @@ def init_connection():
 
 supabase = init_connection()
 
-# 画像処理ロジック
+# 画像処理
 def get_base64_image(image_path):
     if image_path.startswith("http"): return image_path
     if not os.path.exists(image_path): return None
@@ -163,8 +174,8 @@ def render_horizontal_gallery(image_list):
             src = img_data if img_path.startswith("http") else f"data:image/png;base64,{img_data}"
             html_content += f'<img src="{src}" class="scroll-item" />'
         else:
-            dummy_url = f"https://placehold.co/600x400/E0F2F1/00695C?text={os.path.basename(img_path)}"
-            html_content += f'<img src="{dummy_url}" class="scroll-item" />'
+            dummy = f"https://placehold.co/600x400/E0F2F1/00695C?text={os.path.basename(img_path)}"
+            html_content += f'<img src="{dummy}" class="scroll-item" />'
     html_content += '</div>'
     st.markdown(html_content, unsafe_allow_html=True)
 
@@ -173,9 +184,9 @@ def show_safe_image(img_path):
         if img_path.startswith("http"): st.image(img_path, use_container_width=True)
         elif os.path.exists(img_path): st.image(img_path, use_container_width=True)
         else: st.warning(f"⚠️ 画像が見つかりません: {img_path}")
-    except Exception: st.error("画像読み込みエラー")
+    except: st.error("画像エラー")
 
-# --- DB操作関数 ---
+# DB操作
 def load_user_data(user_id):
     if not supabase: return {}
     try:
@@ -184,8 +195,7 @@ def load_user_data(user_id):
         for row in response.data:
             loaded_log[row['date']] = row['actions']
         return loaded_log
-    except Exception as e:
-        return {}
+    except: return {}
 
 def sync_action_to_db(user_id, date, actions_list, total_points):
     if not supabase: return
@@ -195,48 +205,104 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
             "updated_at": datetime.datetime.now().isoformat()
         }
         supabase.table("decokatsu_logs").upsert(data).execute()
+    except: pass
+
+def save_game_score(user_data, score):
+    """ゲームスコア保存"""
+    if not supabase: return
+    try:
+        # schoolが存在しない場合（JCなど）のガード
+        school_val = user_data.get('group', '').split(' ')[0] if 'group' in user_data else "ゲスト"
+        data = {
+            "user_id": user_data['id'],
+            "nickname": user_data['name'],
+            "school": school_val,
+            "time": score
+        }
+        supabase.table("game_scores").insert(data).execute()
     except Exception as e:
-        pass
+        print(f"Game Save Error: {e}")
 
 # ==========================================
-# ★認証関数（ニックネーム照合版）
+# ★ランキング集計ロジック
+# ==========================================
+@st.cache_data(ttl=60) # 1分キャッシュ
+def fetch_all_rankings():
+    if not supabase: return {}, {}, {}, []
+    
+    try:
+        # 1. ユーザー情報の取得 (Schoolなどの属性用)
+        users_res = supabase.table("users").select("user_id, school, grade, class_name").execute()
+        users_df = pd.DataFrame(users_res.data)
+        
+        # 2. ログデータの取得 (ポイント用)
+        logs_res = supabase.table("decokatsu_logs").select("user_id, points").execute()
+        logs_df = pd.DataFrame(logs_res.data)
+        
+        if users_df.empty or logs_df.empty:
+            return {}, {}, {}, []
+
+        # 結合
+        merged = pd.merge(logs_df, users_df, on="user_id", how="left")
+        
+        # --- ① 学校別 削減量ランキング (一人当たり) ---
+        # 学校ごとの合計ポイント
+        school_sum = merged.groupby("school")["points"].sum()
+        # 学校ごとの参加人数 (ログがあるユニークユーザー)
+        school_count = merged.groupby("school")["user_id"].nunique()
+        # 平均計算
+        school_avg = (school_sum / school_count).sort_values(ascending=False).head(10)
+        
+        # --- ② 各学校内 クラス別ランキング (トータルg) ---
+        # 学校・学年・組でグループ化
+        merged["class_full"] = merged["grade"] + " " + merged["class_name"] + "組"
+        class_ranking = {}
+        # 学校ごとに集計
+        for school in users_df["school"].unique():
+            if not school: continue
+            school_data = merged[merged["school"] == school]
+            class_sum = school_data.groupby("class_full")["points"].sum().sort_values(ascending=False).head(3)
+            class_ranking[school] = class_sum
+
+        # --- ③ 学校別 参加率ランキング ---
+        participation_rate = {}
+        for school, count in school_count.items():
+            total_students = SCHOOL_POPULATION.get(school, 1000) # デフォルト1000人
+            rate = (count / total_students) * 100
+            participation_rate[school] = rate
+        
+        part_ranking = pd.Series(participation_rate).sort_values(ascending=False).head(10)
+
+        # --- ④ ゲームランキング ---
+        game_res = supabase.table("game_scores").select("*").order("time", desc=False).limit(10).execute()
+        game_ranking = game_res.data
+
+        return school_avg, class_ranking, part_ranking, game_ranking
+
+    except Exception as e:
+        return {}, {}, {}, []
+
+# ==========================================
+# 4. 認証・ステート管理
 # ==========================================
 def auth_user(user_id, input_nickname, role, school, grade, u_class):
     if not supabase: 
-        return True, "デモモードで起動します", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
-
+        return True, "デモモード", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
     try:
-        response = supabase.table("users").select("*").eq("user_id", user_id).execute()
-        existing_user = response.data
-
-        if existing_user:
-            # ログイン処理
-            stored_nickname = existing_user[0]['nickname']
-            if stored_nickname.strip() == input_nickname.strip():
-                return True, "ログイン成功！おかえりなさい！", {
-                    "id": user_id,
-                    "name": stored_nickname, 
-                    "role": role,
-                    "group": f"{school} {grade}-{u_class}"
-                }
+        res = supabase.table("users").select("*").eq("user_id", user_id).execute()
+        if res.data:
+            stored = res.data[0]['nickname']
+            if stored.strip() == input_nickname.strip():
+                return True, "ログイン成功！", {"id": user_id, "name": stored, "role": role, "group": f"{school} {grade}-{u_class}"}
             else:
-                return False, f"⚠️ ニックネームがちがいます！\n登録されている名前: {stored_nickname}", None
+                return False, f"ニックネームが違います (登録名: {stored})", None
         else:
-            # 新規登録処理
-            new_data = {
-                "user_id": user_id, "nickname": input_nickname,
-                "school": school, "grade": grade, "class_name": u_class
-            }
-            supabase.table("users").insert(new_data).execute()
-            return True, "✨ はじめまして！登録完了！", {
-                "id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"
-            }
-    except Exception as e:
-        return False, f"エラーが発生しました: {e}", None
+            data = {"user_id": user_id, "nickname": input_nickname, "school": school, "grade": grade, "class_name": u_class}
+            supabase.table("users").insert(data).execute()
+            return True, "登録完了！", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
+    except:
+        return False, "エラー", None
 
-# ==========================================
-# 4. ステート管理
-# ==========================================
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
 if 'action_log' not in st.session_state: st.session_state.action_log = {} 
@@ -247,119 +313,67 @@ def go_to(page_name):
     st.rerun()
 
 # ==========================================
-# 5. 各画面コンポーネント
+# 5. 画面コンポーネント
 # ==========================================
-
 def render_header():
     user = st.session_state.user
     name = user['name'] if user else "ゲスト"
-    role_map = {"student": "👦 児童", "family": "🏠 家族", "jc": "👔 JC", "teacher": "🏫 先生"}
-    role_label = role_map.get(user['role'], "ゲスト") if user else ""
+    role_label = {"student": "👦 児童", "family": "🏠 家族", "jc": "👔 JC", "teacher": "🏫 先生"}.get(user['role'], "") if user else ""
+    st.markdown(f"""<div class="header-container"><div style="display:flex;align-items:center;gap:10px;"><div style="font-size:32px;">🌏</div><div class="app-name">おかやまデコ活<br>チャレンジ2026</div></div><div class="user-badge">{role_label} | {name}</div></div>""", unsafe_allow_html=True)
 
-    st.markdown(f"""
-    <div class="header-container">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <div style="font-size:32px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));">🌏</div>
-            <div class="app-name">おかやまデコ活<br>チャレンジ2026</div>
-        </div>
-        <div class="user-badge">
-            {role_label} | {name}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# --- ログイン入口 ---
 def view_login_entry():
-    st.markdown("<div style='text-align:center; margin: 40px 0 30px;'><div style='font-size:80px; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.1));'>🍑</div><h2 style='color:#2E7D32; font-weight:900; letter-spacing:2px;'>参加する入り口を選んでね</h2></div>", unsafe_allow_html=True)
-    
+    st.markdown("<div style='text-align:center; margin: 40px 0 30px;'><div style='font-size:80px;'>🍑</div><h2 style='color:#2E7D32; font-weight:900;'>参加する入り口を選んでね</h2></div>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         st.markdown('<div class="login-btn btn-green">', unsafe_allow_html=True)
-        if st.button("👦\n小学生", key="l_stu", use_container_width=True):
-            st.session_state.temp_role = "student"
-            go_to('LOGIN_FORM')
+        if st.button("👦\n小学生", key="l_stu", use_container_width=True): st.session_state.temp_role = "student"; go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         st.markdown('<div class="login-btn btn-blue">', unsafe_allow_html=True)
-        if st.button("🏠\nご家族", key="l_fam", use_container_width=True):
-            st.session_state.temp_role = "family"
-            go_to('LOGIN_FORM')
+        if st.button("🏠\nご家族", key="l_fam", use_container_width=True): st.session_state.temp_role = "family"; go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
-    
     c3, c4 = st.columns(2)
     with c3:
         st.markdown('<div class="login-btn btn-yellow">', unsafe_allow_html=True)
-        if st.button("👔\nJCメンバー", key="l_jc", use_container_width=True):
-            st.session_state.temp_role = "jc"
-            go_to('LOGIN_FORM')
+        if st.button("👔\nJCメンバー", key="l_jc", use_container_width=True): st.session_state.temp_role = "jc"; go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
     with c4:
         st.markdown('<div class="login-btn btn-purple">', unsafe_allow_html=True)
-        if st.button("🏫\n先生", key="l_tea", use_container_width=True):
-            st.session_state.temp_role = "teacher"
-            go_to('LOGIN_FORM')
+        if st.button("🏫\n先生", key="l_tea", use_container_width=True): st.session_state.temp_role = "teacher"; go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ★ログインフォーム（入力式＆記憶機能付き） ---
 def view_login_form():
     role = st.session_state.temp_role
-    st.markdown(f"<div style='text-align:center; margin-bottom:20px;'><h3 style='font-weight:900; margin-bottom:5px;'>情報を入力してね</h3><span style='background:#ECEFF1; padding:5px 15px; border-radius:15px; font-size:12px; font-weight:bold; color:#546E7A;'>{role.upper()}</span></div>", unsafe_allow_html=True)
-
+    st.markdown(f"<div style='text-align:center; margin-bottom:20px;'><h3 style='font-weight:900;'>情報を入力してね</h3><span style='background:#ECEFF1; padding:5px 15px; border-radius:15px; font-weight:bold;'>{role.upper()}</span></div>", unsafe_allow_html=True)
     with st.form("login"):
         if role in ["student", "family"]:
             st.info("※ 同じ「学校・組・番号」を使えるのは1人だけだよ！")
-            
-            # --- ★前回入力した値をURLパラメータから取得（記憶機能） ---
-            # ページリロードやブックマーク経由で前回の値があれば、それを初期値にする
             qp = st.query_params
-            def_sch = qp.get("sch", "")
-            def_grd = qp.get("grd", "")
-            def_cls = qp.get("cls", "")
-            def_num = qp.get("num", "1")
-            
-            # --- ★入力フォーム（テキスト入力） ---
-            school = st.text_input("小学校名", value=def_sch, placeholder="例：倉敷")
-            
+            school = st.text_input("小学校名", value=qp.get("sch", ""), placeholder="例：倉敷")
             c1, c2, c3 = st.columns(3)
-            # 学年もテキスト入力に変更
-            grade = c1.text_input("学年", value=def_grd, placeholder="例：5")
-            u_class = c2.text_input("組", value=def_cls, placeholder="例：1")
-            # 番号もテキスト入力（オートコンプリートが効きやすい）
-            num = c3.text_input("番号", value=def_num, placeholder="例：15")
-            
+            grade = c1.text_input("学年", value=qp.get("grd", ""), placeholder="5")
+            u_class = c2.text_input("組", value=qp.get("cls", ""), placeholder="1")
+            num = c3.text_input("番号", value=qp.get("num", ""), placeholder="15")
             st.markdown("---")
-            st.caption("📌 はじめての人は、すきなニックネームを決めてね。")
-            st.caption("📌 2回目からは、**同じニックネーム** をいれてね！")
+            st.caption("📌 2回目からは同じニックネームを入れてね")
             name = st.text_input("ニックネーム", placeholder="ももたろう")
-            
             if st.form_submit_button("🚀 スタート！", type="primary"):
                 if not school or not grade or not u_class or not num or not name:
                     st.error("⚠️ 全部入力してね！")
                 else:
                     user_id = f"{school}_{grade}_{u_class}_{num}"
-                    # 認証実行
-                    is_success, msg, user_data = auth_user(user_id, name, role, school, grade, u_class)
-                    
-                    if is_success:
-                        st.session_state.user = user_data
+                    is_ok, msg, u_data = auth_user(user_id, name, role, school, grade, u_class)
+                    if is_ok:
+                        st.session_state.user = u_data
                         st.session_state.action_log = load_user_data(user_id)
-                        
-                        # --- ★次回のためにパラメータを保存（記憶機能） ---
                         st.query_params["sch"] = school
                         st.query_params["grd"] = grade
                         st.query_params["cls"] = u_class
                         st.query_params["num"] = num
-                        
-                        st.toast(msg, icon="🎉")
-                        time.sleep(1)
-                        go_to('HOME')
-                    else:
-                        st.error(msg)
-                
-        else: # JC or Teacher
-            org_label = "所属LOM" if role == "jc" else "担当クラス"
-            org_opts = ["岡山JC", "倉敷JC", "津山JC"] if role == "jc" else ["5年2組", "6年1組"]
-            org = st.selectbox(org_label, org_opts)
+                        st.toast(msg); time.sleep(1); go_to('HOME')
+                    else: st.error(msg)
+        else:
+            org = st.selectbox("所属", ["岡山JC", "倉敷JC", "津山JC"])
             name = st.text_input("氏名")
             if st.form_submit_button("🔥 ログイン", type="primary"):
                 user_id = f"{role}_{name}"
@@ -367,42 +381,20 @@ def view_login_form():
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ホーム画面 ---
 def view_home():
     render_header()
-
-    st.markdown("""
-    <div class="guidebook-box">
-        <div class="guide-title"><span style="font-size:24px;">📚</span> デコ活ガイドブック</div>
-        <div style="font-size:12px; color:#555; margin-bottom:15px;">画像を見て勉強しよう！横にスクロールできるよ ➡️</div>
-    """, unsafe_allow_html=True)
-
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🌱 基本", "🏠 おうち", "🍽️ くらし", "🚗 移動", "🌈 未来"])
-    with tab1: render_horizontal_gallery(GUIDE_IMAGES["basic"])
-    with tab2: render_horizontal_gallery(GUIDE_IMAGES["home"])
-    with tab3: render_horizontal_gallery(GUIDE_IMAGES["living"])
-    with tab4: render_horizontal_gallery(GUIDE_IMAGES["move"])
-    with tab5: render_horizontal_gallery(GUIDE_IMAGES["future"])
+    st.markdown('<div class="guidebook-box"><div class="guide-title"><span style="font-size:24px;">📚</span> デコ活ガイドブック</div><div style="font-size:12px; color:#555; margin-bottom:15px;">画像を見て勉強しよう！横にスクロールできるよ ➡️</div>', unsafe_allow_html=True)
+    t1, t2, t3, t4, t5 = st.tabs(["🌱 基本", "🏠 おうち", "🍽️ くらし", "🚗 移動", "🌈 未来"])
+    with t1: render_horizontal_gallery(GUIDE_IMAGES["basic"])
+    with t2: render_horizontal_gallery(GUIDE_IMAGES["home"])
+    with t3: render_horizontal_gallery(GUIDE_IMAGES["living"])
+    with t4: render_horizontal_gallery(GUIDE_IMAGES["move"])
+    with t5: render_horizontal_gallery(GUIDE_IMAGES["future"])
     st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("""
-    <div style="text-align:center; position:relative; margin-bottom:30px; margin-top:10px;">
-        <div style="font-size:160px; line-height:1; filter: drop-shadow(0 15px 15px rgba(0,100,0,0.2)); z-index:2; position:relative;">🌳</div>
-        <div style="position:absolute; top:40px; left:10px; font-size:50px; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2)); animation: bounce 2s infinite;">🦌</div>
-        <div style="position:absolute; top:80px; right:20px; font-size:40px; filter: drop-shadow(0 5px 5px rgba(0,0,0,0.2));">🐿️</div>
-        <div style="background:white; border:4px solid #4CAF50; border-radius:50px; padding:12px 25px; display:inline-block; font-weight:900; color:#1B5E20; box-shadow:0 8px 15px rgba(0,0,0,0.1); position:relative; top:-20px; z-index:5;">
-            みんなの削減量: 123,456 kg
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    st.markdown('<div style="text-align:center; position:relative; margin-bottom:30px;"><div style="font-size:160px;">🌳</div><div style="background:white; border:4px solid #4CAF50; border-radius:50px; padding:12px 25px; display:inline-block; font-weight:900; color:#1B5E20; position:relative; top:-20px;">みんなの削減量: 123,456 kg</div></div>', unsafe_allow_html=True)
     st.markdown('<div class="big-action-btn">', unsafe_allow_html=True)
-    if st.button("📝 きょうの記録をつける！", use_container_width=True):
-        go_to('ACTION')
+    if st.button("📝 きょうの記録をつける！", use_container_width=True): go_to('ACTION')
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    st.write("") 
-    
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
@@ -414,20 +406,16 @@ def view_home():
         st.markdown('</div>', unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
-        if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True):
-            st.toast("ガイドブックで勉強してね！", icon="📖")
+        if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True): st.toast("勉強してね！")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- アクション記録画面 ---
 def view_action():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
-    
     st.markdown("<h3 style='text-align:center; font-weight:900; margin:20px 0;'>📅 日付を選んでね</h3>", unsafe_allow_html=True)
     days = ["6/1(月)", "6/2(火)", "6/3(水)", "6/4(木)", "6/5(金)"]
     selected = st.radio(" ", days, horizontal=True, label_visibility="collapsed")
     st.info(f"【{selected}】 できたこと全部にチェック！")
-    
     acts = [
         {"id": "elec", "icon": "💡", "pt": 50, "title": "だれもいない へやの でんき をけした！", "desc": "例：トイレの電気をパチンと消した、見てないテレビを消した（CO2削減 -50g）"},
         {"id": "food", "icon": "🍚", "pt": 100, "title": "ごはんを のこさず たべた！", "desc": "例：給食をピカピカにした、苦手な野菜もがんばって食べた（CO2削減 -100g）"},
@@ -435,101 +423,127 @@ def view_action():
         {"id": "sort", "icon": "♻️", "pt": 80, "title": "ゴミを 正（ただ）しく わけた！", "desc": "例：ペットボトルのラベルをはがして捨てた、紙や箱をリサイクルに回した（CO2削減 -80g）"},
         {"id": "family", "icon": "👨‍👩‍👧", "pt": 50, "title": "おうちの 人（ひと）も いっしょに できた！", "desc": "例：おうちの人も、電気・食事・水・ゴミのどれか１つでも気をつけてくれた！（家族ボーナス -50g）"}
     ]
-    
-    completed_today = st.session_state.action_log.get(selected, [])
-    
+    completed = st.session_state.action_log.get(selected, [])
     for act in acts:
         with st.container():
-            c_icon, c_content, c_btn = st.columns([1, 4, 2])
-            with c_icon: st.markdown(f"<div style='font-size:36px; text-align:center'>{act['icon']}</div>", unsafe_allow_html=True)
-            with c_content:
-                st.markdown(f"<div style='font-weight:bold; font-size:16px; margin-top:5px;'>{act['title']}</div>", unsafe_allow_html=True)
+            c1, c2, c3 = st.columns([1, 4, 2])
+            with c1: st.markdown(f"<div style='font-size:36px; text-align:center'>{act['icon']}</div>", unsafe_allow_html=True)
+            with c2: 
+                st.markdown(f"<div style='font-weight:bold;'>{act['title']}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='act-desc'>{act['desc']}</div>", unsafe_allow_html=True)
-            with c_btn:
-                st.write("") 
-                if act['id'] in completed_today:
-                    st.button(f"✅ 達成済", key=f"done_{selected}_{act['id']}", disabled=True, use_container_width=True)
+            with c3:
+                st.write("")
+                if act['id'] in completed: st.button("✅ 達成済", key=f"d_{selected}_{act['id']}", disabled=True, use_container_width=True)
                 else:
-                    if st.button(f"できた! (+{act['pt']})", key=f"{selected}_{act['id']}", use_container_width=True):
-                        if selected not in st.session_state.action_log:
-                            st.session_state.action_log[selected] = []
+                    if st.button(f"できた! (+{act['pt']})", key=f"b_{selected}_{act['id']}", use_container_width=True):
+                        if selected not in st.session_state.action_log: st.session_state.action_log[selected] = []
                         st.session_state.action_log[selected].append(act['id'])
-                        new_actions = st.session_state.action_log[selected]
-                        total_pts = len(new_actions) * 50 
-                        sync_action_to_db(st.session_state.user['id'], selected, new_actions, total_pts)
-                        st.toast(f"ナイス！ {act['pt']}ポイントゲット！", icon="🎉")
-                        st.balloons()
-                        st.rerun()
-            st.markdown("---") 
-
+                        new_acts = st.session_state.action_log[selected]
+                        sync_action_to_db(st.session_state.user['id'], selected, new_acts, len(new_acts)*50)
+                        st.toast("ナイス！", icon="🎉"); st.rerun()
+            st.markdown("---")
     st.markdown(f"**🎮 分別ゲーム**")
-    if st.session_state.game_done:
-        st.button("✅ 達成済み (+50pt)", disabled=True, use_container_width=True)
+    if st.session_state.game_done: st.button("✅ 達成済み (+50pt)", disabled=True, use_container_width=True)
     else:
-        if st.button("▶ ゲームに挑戦する", type="primary", use_container_width=True):
-            go_to('GAME')
-
+        if st.button("▶ ゲームに挑戦する", type="primary", use_container_width=True): go_to('GAME')
     if "6/5" in selected:
-        st.markdown("---")
-        st.success("🎓 全ミッション終了！")
-        if st.button("🏆 認定証をもらう", use_container_width=True):
-            st.balloons()
-            st.image("https://placehold.co/600x400/FFF/D4AF37?text=CERTIFICATE", caption="おかやまエコヒーロー認定証")
+        st.markdown("---"); st.success("🎓 全ミッション終了！")
+        if st.button("🏆 認定証", use_container_width=True): st.balloons(); st.image("https://placehold.co/600x400/FFF/D4AF37?text=CERTIFICATE")
 
-# --- ランキング画面 ---
+# --- ★ランキング画面 (4種実装) ---
 def view_ranking():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
     
-    user_group = st.session_state.user['group']
-    role = st.session_state.user['role']
-    rank_title = "LOM対抗" if role == "jc" else "クラス対抗"
+    st.markdown("<h3 style='text-align:center; font-weight:900;'>🏆 ランキング</h3>", unsafe_allow_html=True)
     
-    st.markdown(f"<div style='text-align:center; margin-bottom:20px'><div style='font-size:50px'>🏆</div><h3 style='font-weight:900'>{rank_title}<br>現在の順位</h3><p>※1人あたりの平均削減量</p></div>", unsafe_allow_html=True)
+    # データの取得・集計
+    school_avg_rank, class_rank, part_rank, game_rank = fetch_all_rankings()
     
-    if role == "jc":
-        ranks = [(1, "岡山JC", 620), (2, "倉敷JC", 580), (3, "津山JC", 450)]
-    else:
-        ranks = [(1, "倉敷第一小 5-2", 850), (2, "伊島小 6-1", 820), (3, "津山東小 4-3", 790)]
+    t1, t2, t3, t4 = st.tabs(["🏫 学校(平均)", "🏢 クラス", "📈 参加率", "🎮 ゲーム"])
     
-    for r, name, score in ranks:
-        is_top = (r == 1)
-        st.markdown(f"""
-        <div class="rank-card {'rank-1' if is_top else ''}">
-            <div class="medal">{'🥇' if r==1 else '🥈' if r==2 else '🥉'}</div>
-            <div style="flex-grow:1">
-                <div style="font-size:12px; font-weight:800; color:#555">{r}位</div>
-                <div style="font-size:18px; font-weight:900">{name}</div>
-            </div>
-            <div style="text-align:right">
-                <div style="font-size:10px; font-weight:bold; color:#777;">平均</div>
-                <div style="color:#2E7D32; font-weight:900; font-size:22px">{score}<span style="font-size:14px">g</span></div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    # 1. 学校別平均
+    with t1:
+        st.caption("一人あたりのCO2削減量 (g)")
+        if not school_avg_rank.empty:
+            for i, (school, score) in enumerate(school_avg_rank.items()):
+                rank = i + 1
+                color_cls = f"rank-{rank}" if rank <= 3 else ""
+                medal = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else ""
+                st.markdown(f"""
+                <div class="rank-card {color_cls}">
+                    <div class="medal">{medal}</div>
+                    <div class="rank-num">{rank}</div>
+                    <div style="flex-grow:1; font-weight:bold;">{school}</div>
+                    <div class="rank-score"><span class="score-val">{int(score):,}</span><span class="score-label">g/人</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+        else: st.info("データ集計中...")
 
-    if role != "jc":
-        st.info(f"あなたのクラス：**{user_group}** は現在 1位 です！")
+    # 2. クラス別 (自分の学校)
+    with t2:
+        my_school = st.session_state.user['group'].split(' ')[0]
+        st.caption(f"{my_school} のクラスランキング (総量)")
+        if my_school in class_rank:
+            series = class_rank[my_school]
+            for i, (cls_name, score) in enumerate(series.items()):
+                rank = i + 1
+                color_cls = f"rank-{rank}" if rank <= 3 else ""
+                medal = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else ""
+                st.markdown(f"""
+                <div class="rank-card {color_cls}">
+                    <div class="medal">{medal}</div>
+                    <div class="rank-num">{rank}</div>
+                    <div style="flex-grow:1; font-weight:bold;">{cls_name}</div>
+                    <div class="rank-score"><span class="score-val">{int(score):,}</span><span class="score-label">g</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+        else: st.info("クラスのデータがまだありません")
 
-# --- 分別ゲーム画面 ---
+    # 3. 参加率
+    with t3:
+        st.caption("全校児童に占める参加者の割合")
+        if not part_rank.empty:
+            for i, (school, rate) in enumerate(part_rank.items()):
+                rank = i + 1
+                color_cls = f"rank-{rank}" if rank <= 3 else ""
+                st.markdown(f"""
+                <div class="rank-card {color_cls}">
+                    <div class="rank-num">{rank}</div>
+                    <div style="flex-grow:1; font-weight:bold;">{school}</div>
+                    <div class="rank-score"><span class="score-val">{rate:.1f}%</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+        else: st.info("データ集計中...")
+
+    # 4. ゲームランキング
+    with t4:
+        st.caption("激闘！分別マスター 個人タイム (早い順)")
+        if game_rank:
+            for i, r in enumerate(game_rank):
+                rank = i + 1
+                color_cls = f"rank-{rank}" if rank <= 3 else ""
+                st.markdown(f"""
+                <div class="rank-card {color_cls}">
+                    <div class="rank-num">{rank}</div>
+                    <div style="flex-grow:1;">
+                        <div style="font-weight:bold;">{r['nickname']}</div>
+                        <div style="font-size:10px; color:#777;">{r['school']}</div>
+                    </div>
+                    <div class="rank-score"><span class="score-val">{r['time']}</span><span class="score-label">秒</span></div>
+                </div>
+                """, unsafe_allow_html=True)
+        else: st.info("まだ記録がありません。一番乗りを目指そう！")
+
 def view_game():
     render_header()
     st.markdown("<h3 style='text-align:center; font-weight:900;'>⏱️ 分別マスター</h3>", unsafe_allow_html=True)
-    
     if 'game_state' not in st.session_state: st.session_state.game_state = 'READY'
     
     if st.session_state.game_state == 'READY':
-        st.markdown("""
-        <div style="background:white; padding:30px; border-radius:25px; text-align:center; border:4px solid #FF9800; box-shadow:0 5px 15px rgba(0,0,0,0.1); margin-bottom:20px;">
-            <div style="font-size:60px;">🔥♻️</div>
-            <p style="font-weight:900; font-size:18px; margin-top:10px;">10問タイムアタック！<br>ミスすると <b style="color:#D32F2F;">+5秒</b> ペナルティ！</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("<div style='background:white; padding:30px; border-radius:25px; text-align:center; border:4px solid #FF9800; margin-bottom:20px;'><div style='font-size:60px;'>🔥♻️</div><p style='font-weight:900;'>10問タイムアタック！<br>ミスすると <b style='color:#D32F2F;'>+5秒</b></p></div>", unsafe_allow_html=True)
         if st.button("🏁 スタート！", type="primary", use_container_width=True):
-            st.session_state.q_list = random.sample([
-                ("🍌 バナナの皮", 0), ("🥤 ペットボトル", 1), ("📦 ダンボール", 1), 
-                ("🥢 割り箸", 0), ("💡 電球", 2), ("🥣 割れた皿", 2)
-            ]*4, 10)
+            st.session_state.q_list = random.sample([("🍌 皮", 0), ("🥤 ペット", 1), ("📦 箱", 1), ("🥢 箸", 0), ("💡 電球", 2), ("🥣 皿", 2)]*4, 10)
             st.session_state.q_idx = 0
             st.session_state.start_t = time.time()
             st.session_state.penalty = 0
@@ -539,48 +553,32 @@ def view_game():
     elif st.session_state.game_state == 'PLAYING':
         idx = st.session_state.q_idx
         q_name, q_type = st.session_state.q_list[idx]
-        
         st.progress((idx)/10, text=f"第 {idx+1} 問")
-        st.markdown(f"<div style='font-size:40px; text-align:center; font-weight:900; padding:40px; background:white; border-radius:20px; border:4px dashed #90A4AE; margin:20px 0; box-shadow:0 5px 10px rgba(0,0,0,0.05);'>{q_name}</div>", unsafe_allow_html=True)
-        
+        st.markdown(f"<div style='font-size:40px; text-align:center; font-weight:900; padding:40px; background:white; border-radius:20px; border:4px dashed #90A4AE; margin:20px 0;'>{q_name}</div>", unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
         def ans(t):
-            if t == q_type: 
-                st.toast("⭕ せいかい！")
-            else:
-                st.toast("❌ +5秒", icon="🚨")
-                st.session_state.penalty += 5
-            
-            if idx + 1 < 10: 
-                st.session_state.q_idx += 1
+            if t == q_type: st.toast("⭕ せいかい！")
+            else: st.toast("❌ +5秒", icon="🚨"); st.session_state.penalty += 5
+            if idx + 1 < 10: st.session_state.q_idx += 1
             else:
                 st.session_state.final_time = round(time.time() - st.session_state.start_t + st.session_state.penalty, 2)
                 st.session_state.game_done = True
                 st.session_state.game_state = 'FINISHED'
+                save_game_score(st.session_state.user, st.session_state.final_time)
             st.rerun()
-
-        st.markdown("<style>div.stButton button {height: 80px !important; font-size: 20px !important;}</style>", unsafe_allow_html=True)
+        st.markdown("<style>div.stButton button {height: 80px !important;}</style>", unsafe_allow_html=True)
         if c1.button("🔥 燃える", use_container_width=True): ans(0)
         if c2.button("♻️ 資源", use_container_width=True): ans(1)
         if c3.button("🧱 埋立", use_container_width=True): ans(2)
 
     elif st.session_state.game_state == 'FINISHED':
         st.balloons()
-        st.markdown(f"""
-        <div style="background:white; padding:30px; border-radius:25px; text-align:center; border:4px solid #4CAF50; box-shadow:0 10px 20px rgba(0,0,0,0.1);">
-            <h2 style="color:#2E7D32; margin:0;">🎉 クリア！</h2>
-            <div style="font-size:60px; font-weight:900; color:#333; margin:20px 0;">{st.session_state.final_time} <span style="font-size:30px;">秒</span></div>
-            <p style="color:#D32F2F; font-weight:bold;">(ペナルティ +{st.session_state.penalty}秒 含む)</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
+        st.markdown(f"<div style='background:white; padding:30px; border-radius:25px; text-align:center; border:4px solid #4CAF50;'><h2 style='color:#2E7D32;'>🎉 クリア！</h2><div style='font-size:60px; font-weight:900;'>{st.session_state.final_time}秒</div><p style='color:#D32F2F;'>(ペナルティ +{st.session_state.penalty}秒 込)</p></div>", unsafe_allow_html=True)
         st.write("")
-        if st.button("📝 記録画面に戻る", type="primary", use_container_width=True):
-            go_to('ACTION')
-            st.session_state.game_state = 'READY' 
+        if st.button("📝 記録画面に戻る", type="primary", use_container_width=True): go_to('ACTION'); st.session_state.game_state = 'READY'
 
 # ==========================================
-# 7. メインルーティング
+# 7. ルーティング
 # ==========================================
 if __name__ == "__main__":
     p = st.session_state.page
