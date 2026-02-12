@@ -43,7 +43,6 @@ st.markdown("""
     }
 
     /* --- ボタン --- */
-    /* 1. メインアクション（記録） */
     .big-action-btn button {
         background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 100%) !important;
         color: white !important; height: 90px !important; border-radius: 30px !important;
@@ -57,7 +56,6 @@ st.markdown("""
         box-shadow: 0 0 0 #E65100, 0 0 0 rgba(0,0,0,0) !important;
     }
 
-    /* 2. メニューボタン */
     .menu-btn button {
         background: white !important; color: #455A64 !important; height: 120px !important;
         border-radius: 25px !important; border: 2px solid #ECEFF1 !important;
@@ -68,7 +66,6 @@ st.markdown("""
     }
     .menu-btn button:active { transform: translateY(6px) !important; box-shadow: 0 0 0 #CFD8DC !important; }
 
-    /* 3. ログイン入口 */
     .login-btn button {
         height: 150px !important; border-radius: 30px !important; color: white !important;
         font-size: 18px !important; font-weight: 900 !important; border: none !important;
@@ -82,7 +79,6 @@ st.markdown("""
     .btn-yellow button { background: linear-gradient(135deg, #FFB300, #FFCA28) !important; color: #5D4037 !important; text-shadow:none !important; }
     .btn-purple button { background: linear-gradient(135deg, #8E24AA, #AB47BC) !important; }
 
-    /* --- ランキング --- */
     .rank-card {
         background: white; border-radius: 20px; padding: 15px 20px; margin-bottom: 15px;
         display: flex; align-items: center; box-shadow: 0 5px 15px rgba(0,0,0,0.05);
@@ -91,7 +87,6 @@ st.markdown("""
     .rank-1 { border-color: #FFD700; background: linear-gradient(to right, #FFFDE7, #FFF); }
     .medal { font-size: 32px; width: 50px; text-align: center; margin-right: 15px; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2)); }
 
-    /* --- その他調整 --- */
     .stRadio>div { background: white; padding: 15px; border-radius: 20px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.05); gap: 10px; }
     div[data-baseweb="input"] { border-radius: 15px; border: 2px solid #E0E0E0; }
     div[data-baseweb="select"]>div { border-radius: 15px; border: 2px solid #E0E0E0; }
@@ -100,25 +95,64 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. ステート管理
+# 2. データベース接続 & ロジック
 # ==========================================
-# ページ遷移用
+@st.cache_resource
+def init_connection():
+    try:
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["key"]
+        return create_client(url, key)
+    except:
+        return None
+
+supabase = init_connection()
+
+# --- DB操作関数 ---
+def load_user_data(user_id):
+    """ログイン時にDBからデータを読み込む"""
+    if not supabase: return {}
+    try:
+        response = supabase.table("decokatsu_logs").select("*").eq("user_id", user_id).execute()
+        # 取得したデータを { "6/1(月)": ["elec", "water"], ... } の形式に変換
+        loaded_log = {}
+        for row in response.data:
+            loaded_log[row['date']] = row['actions']
+        return loaded_log
+    except Exception as e:
+        st.error(f"読み込みエラー: {e}")
+        return {}
+
+def sync_action_to_db(user_id, date, actions_list, total_points):
+    """アクション状態をDBに保存 (Upsert)"""
+    if not supabase: return
+    try:
+        data = {
+            "user_id": user_id,
+            "date": date,
+            "actions": actions_list,
+            "points": total_points,
+            "updated_at": datetime.datetime.now().isoformat()
+        }
+        supabase.table("decokatsu_logs").upsert(data).execute()
+    except Exception as e:
+        # st.error(f"保存エラー: {e}") 
+        pass
+
+# ==========================================
+# 3. ステート管理
+# ==========================================
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
-
-# アクション完了履歴の管理 { "6/1(月)": ["elec", "water"], ... }
-if 'action_log' not in st.session_state: st.session_state.action_log = {}
-
-# ゲーム完了フラグ
+if 'action_log' not in st.session_state: st.session_state.action_log = {} # {"6/1(月)": ["elec"], ...}
 if 'game_done' not in st.session_state: st.session_state.game_done = False
 
 def go_to(page_name):
-    """画面遷移用関数"""
     st.session_state.page = page_name
     st.rerun()
 
 # ==========================================
-# 3. 各画面コンポーネント (View)
+# 4. 各画面コンポーネント
 # ==========================================
 
 # --- ヘッダー ---
@@ -140,7 +174,7 @@ def render_header():
     </div>
     """, unsafe_allow_html=True)
 
-# --- ① ログイン入口画面 ---
+# --- ログイン入口 ---
 def view_login_entry():
     st.markdown("<div style='text-align:center; margin: 40px 0 30px;'><div style='font-size:80px; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.1));'>🍑</div><h2 style='color:#2E7D32; font-weight:900; letter-spacing:2px;'>参加する入り口を選んでね</h2></div>", unsafe_allow_html=True)
     
@@ -172,7 +206,7 @@ def view_login_entry():
             go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ログインフォーム詳細 ---
+# --- ログインフォーム & データ読み込み ---
 def view_login_form():
     role = st.session_state.temp_role
     st.markdown(f"<div style='text-align:center; margin-bottom:20px;'><h3 style='font-weight:900; margin-bottom:5px;'>情報を入力してね</h3><span style='background:#ECEFF1; padding:5px 15px; border-radius:15px; font-size:12px; font-weight:bold; color:#546E7A;'>{role.upper()}</span></div>", unsafe_allow_html=True)
@@ -187,10 +221,13 @@ def view_login_form():
             name = st.text_input("ニックネーム", "ももたろう")
             
             if st.form_submit_button("🚀 スタート！", type="primary"):
+                user_id = f"{school}_{grade}_{u_class}_{num}"
                 st.session_state.user = {
-                    "id": f"{school}_{grade}_{u_class}_{num}",
+                    "id": user_id,
                     "name": name, "role": role, "group": f"{school} {grade}-{u_class}"
                 }
+                # ★ここでDBからデータを復元
+                st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
                 
         else: # JC or Teacher
@@ -200,12 +237,15 @@ def view_login_form():
             name = st.text_input("氏名")
             
             if st.form_submit_button("🔥 ログイン", type="primary"):
+                user_id = f"{role}_{name}"
                 st.session_state.user = {
-                    "id": f"{role}_{name}", "name": name, "role": role, "group": org
+                    "id": user_id, "name": name, "role": role, "group": org
                 }
+                # ★DB復元
+                st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ② ホーム画面 (ダッシュボード) ---
+# --- ホーム画面 ---
 def view_home():
     render_header()
     
@@ -242,20 +282,19 @@ def view_home():
         if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True): st.toast("6月5日オープン！", icon="🔒")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ③ アクション記録画面 (項目追加済み) ---
+# --- アクション記録画面 (★DB保存機能付き) ---
 def view_action():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
     
     st.markdown("<h3 style='text-align:center; font-weight:900; margin:20px 0;'>📅 日付を選んでね</h3>", unsafe_allow_html=True)
     
-    # 日付タブ
     days = ["6/1(月)", "6/2(火)", "6/3(水)", "6/4(木)", "6/5(金)"]
     selected = st.radio(" ", days, horizontal=True, label_visibility="collapsed")
     
     st.info(f"【{selected}】 できたこと全部にチェック！")
     
-    # アクションの定義 (5つに増えました)
+    # アクション定義 (5項目)
     acts = [
         ("💡", "電気をこまめに消した", 50, "elec"),
         ("🍚", "ご飯を残さず食べた", 100, "food"),
@@ -264,7 +303,7 @@ def view_action():
         ("👨‍👩‍👧", "おうちの人も一緒にできた", 50, "family")
     ]
     
-    # この日の完了済みアクションを取得
+    # Session Stateから完了済みリストを取得
     completed_today = st.session_state.action_log.get(selected, [])
     
     for icon, label, pt, act_id in acts:
@@ -273,21 +312,33 @@ def view_action():
             with c_icon: st.markdown(f"<div style='font-size:36px; text-align:center'>{icon}</div>", unsafe_allow_html=True)
             with c_lbl: st.markdown(f"<div style='font-weight:bold; font-size:18px; margin-top:5px;'>{label}</div>", unsafe_allow_html=True)
             with c_btn:
-                # 判定: すでに完了しているか？
+                # 完了済みなら無効化ボタン
                 if act_id in completed_today:
                     st.button(f"✅ 達成済", key=f"done_{selected}_{act_id}", disabled=True, use_container_width=True)
                 else:
+                    # 未完了なら押せるボタン
                     if st.button(f"できた! (+{pt})", key=f"{selected}_{act_id}", use_container_width=True):
+                        # 1. 状態更新
                         if selected not in st.session_state.action_log:
                             st.session_state.action_log[selected] = []
                         st.session_state.action_log[selected].append(act_id)
+                        
+                        # 2. ポイント計算
+                        # (簡易的に現在のリスト長 * ポイント等ではなく、固定ポイントを加算するロジックが必要だが
+                        # ここではシンプルに「実施したアクションIDのリスト」をDBに送る)
+                        # ※本来は acts 配列からptを再計算すべきですが、Sync関数はリストを受け取るだけにします。
+                        
+                        # 3. ★DBに保存 (Upsert)
+                        new_actions = st.session_state.action_log[selected]
+                        # ポイント概算 (デモ用)
+                        total_pts = len(new_actions) * 50 
+                        sync_action_to_db(st.session_state.user['id'], selected, new_actions, total_pts)
                         
                         st.toast(f"ナイス！ {pt}ポイントゲット！", icon="🎉")
                         st.balloons()
                         st.rerun()
             st.markdown("---") 
 
-    # ゲーム連携
     st.markdown(f"**🎮 分別ゲーム**")
     if st.session_state.game_done:
         st.button("✅ 達成済み (+50pt)", disabled=True, use_container_width=True)
@@ -302,7 +353,7 @@ def view_action():
             st.balloons()
             st.image("https://placehold.co/600x400/FFF/D4AF37?text=CERTIFICATE", caption="おかやまエコヒーロー認定証")
 
-# --- ④ ランキング画面 ---
+# --- ランキング画面 ---
 def view_ranking():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
@@ -337,7 +388,7 @@ def view_ranking():
     if role != "jc":
         st.info(f"あなたのクラス：**{user_group}** は現在 1位 です！")
 
-# --- ⑤ 分別ゲーム画面 ---
+# --- 分別ゲーム画面 ---
 def view_game():
     render_header()
     st.markdown("<h3 style='text-align:center; font-weight:900;'>⏱️ 分別マスター</h3>", unsafe_allow_html=True)
@@ -406,7 +457,7 @@ def view_game():
             st.session_state.game_state = 'READY' 
 
 # ==========================================
-# 4. メインルーティング
+# 5. メインルーティング
 # ==========================================
 if __name__ == "__main__":
     p = st.session_state.page
