@@ -13,16 +13,15 @@ from supabase import create_client, Client
 GUIDE_IMAGES = {
     "basic": [
         "https://placehold.co/800x600/E0F2F1/00695C?text=資料1：デコ活ってなに？", 
-        # "guide_basic_1.png",  <-- 本番はこのようにファイル名を書く
-        # "guide_basic_2.png"
+        # "decokatsu_panel_ver03_page-0001.jpg",  <-- 本番はこのようにファイル名を書く
     ],
     "action": [
         "https://placehold.co/800x600/FFF3E0/E65100?text=資料2：今日からできるアクション",
-        # "guide_action.png"
+        # "decokatsu_panel_ver03_page-0002.jpg"
     ],
     "future": [
         "https://placehold.co/800x600/E8EAF6/3F51B5?text=資料3：10年後の豊かな暮らし",
-        # "guide_future.png"
+        # "decokatsu_panel_ver03_page-0003.jpg"
     ]
 }
 
