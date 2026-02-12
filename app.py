@@ -18,7 +18,7 @@ SCHOOL_POPULATION = {
     "伊島小学校": 600
 }
 
-# ガイドブック画像
+# ガイドブック画像設定 (ファイル名を指定)
 GUIDE_IMAGES = {
     "basic": ["basic_1.png", "basic_2.png"],
     "home": ["action_1.png", "action_2.png"],
@@ -77,9 +77,7 @@ st.markdown("""
     .rank-num {
         font-size: 20px; font-weight: 900; color: #555; width: 40px; text-align: center; margin-right: 10px;
     }
-    .rank-score {
-        text-align: right; margin-left: auto;
-    }
+    .rank-score { text-align: right; margin-left: auto; }
     .score-val { color: #2E7D32; font-weight: 900; font-size: 20px; }
     .score-label { font-size: 10px; font-weight: bold; color: #777; display: block;}
 
@@ -92,7 +90,7 @@ st.markdown("""
     }
     .stTabs [aria-selected="true"] { background-color: #fff; color: #2E7D32; border-top: 3px solid #2E7D32; }
 
-    /* その他UI要素 */
+    /* UI要素 */
     .big-action-btn button {
         background: linear-gradient(135deg, #FF6F00 0%, #FF8F00 100%) !important;
         color: white !important; height: 90px !important; border-radius: 30px !important;
@@ -159,7 +157,7 @@ def init_connection():
 
 supabase = init_connection()
 
-# 画像処理
+# --- 画像処理 ---
 def get_base64_image(image_path):
     if image_path.startswith("http"): return image_path
     if not os.path.exists(image_path): return None
@@ -179,14 +177,7 @@ def render_horizontal_gallery(image_list):
     html_content += '</div>'
     st.markdown(html_content, unsafe_allow_html=True)
 
-def show_safe_image(img_path):
-    try:
-        if img_path.startswith("http"): st.image(img_path, use_container_width=True)
-        elif os.path.exists(img_path): st.image(img_path, use_container_width=True)
-        else: st.warning(f"⚠️ 画像が見つかりません: {img_path}")
-    except: st.error("画像エラー")
-
-# DB操作
+# --- DB操作 ---
 def load_user_data(user_id):
     if not supabase: return {}
     try:
@@ -208,10 +199,8 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
     except: pass
 
 def save_game_score(user_data, score):
-    """ゲームスコア保存"""
     if not supabase: return
     try:
-        # schoolが存在しない場合（JCなど）のガード
         school_val = user_data.get('group', '').split(' ')[0] if 'group' in user_data else "ゲスト"
         data = {
             "user_id": user_data['id'],
@@ -220,74 +209,54 @@ def save_game_score(user_data, score):
             "time": score
         }
         supabase.table("game_scores").insert(data).execute()
-    except Exception as e:
-        print(f"Game Save Error: {e}")
+    except: pass
 
-# ==========================================
-# ★ランキング集計ロジック
-# ==========================================
-@st.cache_data(ttl=60) # 1分キャッシュ
+# --- ランキング集計 ---
+@st.cache_data(ttl=60)
 def fetch_all_rankings():
     if not supabase: return {}, {}, {}, []
-    
     try:
-        # 1. ユーザー情報の取得 (Schoolなどの属性用)
         users_res = supabase.table("users").select("user_id, school, grade, class_name").execute()
         users_df = pd.DataFrame(users_res.data)
-        
-        # 2. ログデータの取得 (ポイント用)
         logs_res = supabase.table("decokatsu_logs").select("user_id, points").execute()
         logs_df = pd.DataFrame(logs_res.data)
         
-        if users_df.empty or logs_df.empty:
-            return {}, {}, {}, []
+        if users_df.empty or logs_df.empty: return {}, {}, {}, []
 
-        # 結合
         merged = pd.merge(logs_df, users_df, on="user_id", how="left")
         
-        # --- ① 学校別 削減量ランキング (一人当たり) ---
-        # 学校ごとの合計ポイント
+        # 1. 学校別平均
         school_sum = merged.groupby("school")["points"].sum()
-        # 学校ごとの参加人数 (ログがあるユニークユーザー)
         school_count = merged.groupby("school")["user_id"].nunique()
-        # 平均計算
         school_avg = (school_sum / school_count).sort_values(ascending=False).head(10)
         
-        # --- ② 各学校内 クラス別ランキング (トータルg) ---
-        # 学校・学年・組でグループ化
+        # 2. クラス別総量
         merged["class_full"] = merged["grade"] + " " + merged["class_name"] + "組"
         class_ranking = {}
-        # 学校ごとに集計
         for school in users_df["school"].unique():
             if not school: continue
             school_data = merged[merged["school"] == school]
             class_sum = school_data.groupby("class_full")["points"].sum().sort_values(ascending=False).head(3)
             class_ranking[school] = class_sum
 
-        # --- ③ 学校別 参加率ランキング ---
+        # 3. 参加率
         participation_rate = {}
         for school, count in school_count.items():
-            total_students = SCHOOL_POPULATION.get(school, 1000) # デフォルト1000人
-            rate = (count / total_students) * 100
-            participation_rate[school] = rate
-        
+            total = SCHOOL_POPULATION.get(school, 1000)
+            participation_rate[school] = (count / total) * 100
         part_ranking = pd.Series(participation_rate).sort_values(ascending=False).head(10)
 
-        # --- ④ ゲームランキング ---
+        # 4. ゲーム
         game_res = supabase.table("game_scores").select("*").order("time", desc=False).limit(10).execute()
-        game_ranking = game_res.data
+        return school_avg, class_ranking, part_ranking, game_res.data
 
-        return school_avg, class_ranking, part_ranking, game_ranking
-
-    except Exception as e:
-        return {}, {}, {}, []
+    except: return {}, {}, {}, []
 
 # ==========================================
 # 4. 認証・ステート管理
 # ==========================================
 def auth_user(user_id, input_nickname, role, school, grade, u_class):
-    if not supabase: 
-        return True, "デモモード", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
+    if not supabase: return True, "デモモード", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
     try:
         res = supabase.table("users").select("*").eq("user_id", user_id).execute()
         if res.data:
@@ -300,8 +269,7 @@ def auth_user(user_id, input_nickname, role, school, grade, u_class):
             data = {"user_id": user_id, "nickname": input_nickname, "school": school, "grade": grade, "class_name": u_class}
             supabase.table("users").insert(data).execute()
             return True, "登録完了！", {"id": user_id, "name": input_nickname, "role": role, "group": f"{school} {grade}-{u_class}"}
-    except:
-        return False, "エラー", None
+    except: return False, "エラー", None
 
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
@@ -450,90 +418,48 @@ def view_action():
         st.markdown("---"); st.success("🎓 全ミッション終了！")
         if st.button("🏆 認定証", use_container_width=True): st.balloons(); st.image("https://placehold.co/600x400/FFF/D4AF37?text=CERTIFICATE")
 
-# --- ★ランキング画面 (4種実装) ---
 def view_ranking():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
-    
     st.markdown("<h3 style='text-align:center; font-weight:900;'>🏆 ランキング</h3>", unsafe_allow_html=True)
-    
-    # データの取得・集計
-    school_avg_rank, class_rank, part_rank, game_rank = fetch_all_rankings()
-    
+    school_avg, class_rank, part_rank, game_rank = fetch_all_rankings()
     t1, t2, t3, t4 = st.tabs(["🏫 学校(平均)", "🏢 クラス", "📈 参加率", "🎮 ゲーム"])
     
-    # 1. 学校別平均
     with t1:
-        st.caption("一人あたりのCO2削減量 (g)")
-        if not school_avg_rank.empty:
-            for i, (school, score) in enumerate(school_avg_rank.items()):
+        st.caption("一人あたりの削減量")
+        if not school_avg.empty:
+            for i, (school, score) in enumerate(school_avg.items()):
                 rank = i + 1
-                color_cls = f"rank-{rank}" if rank <= 3 else ""
-                medal = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else ""
-                st.markdown(f"""
-                <div class="rank-card {color_cls}">
-                    <div class="medal">{medal}</div>
-                    <div class="rank-num">{rank}</div>
-                    <div style="flex-grow:1; font-weight:bold;">{school}</div>
-                    <div class="rank-score"><span class="score-val">{int(score):,}</span><span class="score-label">g/人</span></div>
-                </div>
-                """, unsafe_allow_html=True)
-        else: st.info("データ集計中...")
-
-    # 2. クラス別 (自分の学校)
+                color = f"rank-{rank}" if rank <= 3 else ""
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{school}</div><div class="rank-score"><span class="score-val">{int(score)}</span>g</div></div>', unsafe_allow_html=True)
+        else: st.info("集計中...")
+        
     with t2:
         my_school = st.session_state.user['group'].split(' ')[0]
-        st.caption(f"{my_school} のクラスランキング (総量)")
+        st.caption(f"{my_school} のクラス対抗")
         if my_school in class_rank:
-            series = class_rank[my_school]
-            for i, (cls_name, score) in enumerate(series.items()):
+            for i, (cls, score) in enumerate(class_rank[my_school].items()):
                 rank = i + 1
-                color_cls = f"rank-{rank}" if rank <= 3 else ""
-                medal = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else ""
-                st.markdown(f"""
-                <div class="rank-card {color_cls}">
-                    <div class="medal">{medal}</div>
-                    <div class="rank-num">{rank}</div>
-                    <div style="flex-grow:1; font-weight:bold;">{cls_name}</div>
-                    <div class="rank-score"><span class="score-val">{int(score):,}</span><span class="score-label">g</span></div>
-                </div>
-                """, unsafe_allow_html=True)
-        else: st.info("クラスのデータがまだありません")
+                color = f"rank-{rank}" if rank <= 3 else ""
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{cls}</div><div class="rank-score"><span class="score-val">{int(score)}</span>g</div></div>', unsafe_allow_html=True)
+        else: st.info("データなし")
 
-    # 3. 参加率
     with t3:
-        st.caption("全校児童に占める参加者の割合")
+        st.caption("参加率ランキング")
         if not part_rank.empty:
             for i, (school, rate) in enumerate(part_rank.items()):
                 rank = i + 1
-                color_cls = f"rank-{rank}" if rank <= 3 else ""
-                st.markdown(f"""
-                <div class="rank-card {color_cls}">
-                    <div class="rank-num">{rank}</div>
-                    <div style="flex-grow:1; font-weight:bold;">{school}</div>
-                    <div class="rank-score"><span class="score-val">{rate:.1f}%</span></div>
-                </div>
-                """, unsafe_allow_html=True)
-        else: st.info("データ集計中...")
+                color = f"rank-{rank}" if rank <= 3 else ""
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;font-weight:bold;">{school}</div><div class="rank-score"><span class="score-val">{rate:.1f}%</span></div></div>', unsafe_allow_html=True)
 
-    # 4. ゲームランキング
     with t4:
-        st.caption("激闘！分別マスター 個人タイム (早い順)")
+        st.caption("ゲームタイムランキング")
         if game_rank:
             for i, r in enumerate(game_rank):
                 rank = i + 1
-                color_cls = f"rank-{rank}" if rank <= 3 else ""
-                st.markdown(f"""
-                <div class="rank-card {color_cls}">
-                    <div class="rank-num">{rank}</div>
-                    <div style="flex-grow:1;">
-                        <div style="font-weight:bold;">{r['nickname']}</div>
-                        <div style="font-size:10px; color:#777;">{r['school']}</div>
-                    </div>
-                    <div class="rank-score"><span class="score-val">{r['time']}</span><span class="score-label">秒</span></div>
-                </div>
-                """, unsafe_allow_html=True)
-        else: st.info("まだ記録がありません。一番乗りを目指そう！")
+                color = f"rank-{rank}" if rank <= 3 else ""
+                p_name = r.get('nickname', '名無し')
+                st.markdown(f'<div class="rank-card {color}"><div class="rank-num">{rank}</div><div style="flex-grow:1;"><div style="font-weight:bold;">{p_name}</div><div style="font-size:10px;">{r["school"]}</div></div><div class="rank-score"><span class="score-val">{r["time"]}</span>秒</div></div>', unsafe_allow_html=True)
 
 def view_game():
     render_header()
