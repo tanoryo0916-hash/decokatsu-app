@@ -13,15 +13,14 @@ from supabase import create_client, Client
 # ※ファイルは app.py と同じフォルダに置いてください。
 GUIDE_IMAGES = {
     "basic": [
-        "basic_1.jpg",  # 例: 1枚目の画像
-        "basic_2.jpg"   # 例: 2枚目の画像
+        "decokatsu_panel_ver03_page-0001.jpg",  # 例: 1枚目の画像
     ],
     "action": [
-        "action_1.jpg",
+        "decokatsu_panel_ver03_page-0002.jpg",
         # "action_2.jpg"
     ],
     "future": [
-        "deco_poster_action_ver_01_page-0001.jpg",
+        "decokatsu_panel_ver03_page-0003.jpg",
         # "future_2.jpg"
     ]
 }
