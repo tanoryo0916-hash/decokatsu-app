@@ -33,7 +33,7 @@ st.markdown("""
         border-radius: 0 0 30px 30px;
         box-shadow: 0 10px 20px rgba(0,0,0,0.05);
         display: flex; justify-content: space-between; align-items: center;
-        margin-bottom: 30px; border-bottom: 4px solid #C8E6C9;
+        margin-bottom: 20px; border-bottom: 4px solid #C8E6C9;
     }
     .app-name { font-size: 20px; font-weight: 900; color: #2E7D32; line-height: 1.2; }
     .user-badge {
@@ -41,6 +41,35 @@ st.markdown("""
         border-radius: 20px; font-size: 13px; font-weight: 800;
         display: flex; align-items: center; gap: 5px; border: 2px solid #C8E6C9;
     }
+
+    /* --- ★追加: ガイドブック（勉強）ゾーンのデザイン --- */
+    .guidebook-box {
+        background: white;
+        border-radius: 20px;
+        padding: 20px;
+        margin-bottom: 30px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        border: 2px solid #E0F2F1;
+    }
+    .guide-title {
+        font-size: 18px; font-weight: 900; color: #00695C;
+        margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
+    }
+    .guide-card {
+        background: #E0F2F1; padding: 15px; border-radius: 15px;
+        margin-bottom: 10px; border-left: 5px solid #009688;
+    }
+    .guide-label { font-size: 14px; font-weight: 800; color: #00796B; margin-bottom: 5px; }
+    .guide-text { font-size: 14px; line-height: 1.6; }
+    
+    /* タブのカスタマイズ */
+    .stTabs [data-baseweb="tab-list"] { gap: 5px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 50px; white-space: pre-wrap;
+        background-color: #F1F8E9; border-radius: 10px 10px 0 0;
+        gap: 1px; padding-top: 10px; padding-bottom: 10px;
+    }
+    .stTabs [aria-selected="true"] { background-color: #fff; color: #2E7D32; border-top: 3px solid #2E7D32; }
 
     /* --- ボタン --- */
     .big-action-btn button {
@@ -110,21 +139,17 @@ supabase = init_connection()
 
 # --- DB操作関数 ---
 def load_user_data(user_id):
-    """ログイン時にDBからデータを読み込む"""
     if not supabase: return {}
     try:
         response = supabase.table("decokatsu_logs").select("*").eq("user_id", user_id).execute()
-        # 取得したデータを { "6/1(月)": ["elec", "water"], ... } の形式に変換
         loaded_log = {}
         for row in response.data:
             loaded_log[row['date']] = row['actions']
         return loaded_log
     except Exception as e:
-        st.error(f"読み込みエラー: {e}")
         return {}
 
 def sync_action_to_db(user_id, date, actions_list, total_points):
-    """アクション状態をDBに保存 (Upsert)"""
     if not supabase: return
     try:
         data = {
@@ -136,7 +161,6 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
         }
         supabase.table("decokatsu_logs").upsert(data).execute()
     except Exception as e:
-        # st.error(f"保存エラー: {e}") 
         pass
 
 # ==========================================
@@ -144,7 +168,7 @@ def sync_action_to_db(user_id, date, actions_list, total_points):
 # ==========================================
 if 'page' not in st.session_state: st.session_state.page = 'LOGIN'
 if 'user' not in st.session_state: st.session_state.user = None
-if 'action_log' not in st.session_state: st.session_state.action_log = {} # {"6/1(月)": ["elec"], ...}
+if 'action_log' not in st.session_state: st.session_state.action_log = {} 
 if 'game_done' not in st.session_state: st.session_state.game_done = False
 
 def go_to(page_name):
@@ -152,7 +176,38 @@ def go_to(page_name):
     st.rerun()
 
 # ==========================================
-# 4. 各画面コンポーネント
+# 4. コンテンツデータ（デコ活資料）
+# ==========================================
+# PDF資料から抽出した内容
+DECO_GUIDE = {
+    "basic": {
+        "title": "デコ活ってなに？",
+        "content": [
+            ("デコ活の名前のヒミツ", "「脱炭素（De）」と「エコ（Eco）」を組み合わせた新しい言葉だよ！"),
+            ("目指していること", "2050年までに、CO2（二酸化炭素）を実質ゼロにする「カーボンニュートラル」を目指しているんだ。"),
+            ("バタフライエフェクト", "ロゴマークは蝶々（ちょうちょ）。一人ひとりの小さな行動が、世界を変える大きな風になるという意味が込められているよ。")
+        ]
+    },
+    "action": {
+        "title": "今日からできること",
+        "content": [
+            ("🏠 おうちで", "・電気をこまめに消す\n・食べ残しをしない\n・ゴミを正しく分ける"),
+            ("🚗 移動するとき", "・近くなら歩いていく\n・自転車や電車バスを使う"),
+            ("👗 お買い物で", "・長く使える服を選ぶ\n・地元の野菜を食べる（地産地消）")
+        ]
+    },
+    "future": {
+        "title": "10年後の豊かな暮らし",
+        "content": [
+            ("💰 お金が貯まる！", "省エネ家電や断熱リフォーム、太陽光発電などで、年間約43万円も節約できるかも！？"),
+            ("⏰ 時間が増える！", "テレワークや自動運転などで、年間約388時間（16日分！）も自由な時間が増えるかも！？"),
+            ("🌡️ 健康になる！", "お家の中が暖かくなると、ヒートショック（急な温度変化で倒れること）を防げるよ。")
+        ]
+    }
+}
+
+# ==========================================
+# 5. 各画面コンポーネント
 # ==========================================
 
 # --- ヘッダー ---
@@ -206,7 +261,7 @@ def view_login_entry():
             go_to('LOGIN_FORM')
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- ログインフォーム & データ読み込み ---
+# --- ログインフォーム ---
 def view_login_form():
     role = st.session_state.temp_role
     st.markdown(f"<div style='text-align:center; margin-bottom:20px;'><h3 style='font-weight:900; margin-bottom:5px;'>情報を入力してね</h3><span style='background:#ECEFF1; padding:5px 15px; border-radius:15px; font-size:12px; font-weight:bold; color:#546E7A;'>{role.upper()}</span></div>", unsafe_allow_html=True)
@@ -226,7 +281,6 @@ def view_login_form():
                     "id": user_id,
                     "name": name, "role": role, "group": f"{school} {grade}-{u_class}"
                 }
-                # ★ここでDBからデータを復元
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
                 
@@ -241,14 +295,48 @@ def view_login_form():
                 st.session_state.user = {
                     "id": user_id, "name": name, "role": role, "group": org
                 }
-                # ★DB復元
                 st.session_state.action_log = load_user_data(user_id)
                 go_to('HOME')
 
-# --- ホーム画面 ---
+# --- ホーム画面（★デコ活ガイドブック実装） ---
 def view_home():
     render_header()
-    
+
+    # --- 📚 デコ活ガイドブック（勉強ゾーン） ---
+    st.markdown("""
+    <div class="guidebook-box">
+        <div class="guide-title">
+            <span style="font-size:24px;">📚</span> デコ活ガイドブック
+        </div>
+        <div style="font-size:12px; color:#555; margin-bottom:15px;">
+            デコ活ってなに？資料を見て勉強しよう！<br>ここからクイズが出るかも！？
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 3つのタブで情報を整理
+    tab1, tab2, tab3 = st.tabs(["🌱 基本", "🏃 アクション", "🌈 未来"])
+
+    with tab1:
+        data = DECO_GUIDE["basic"]
+        st.caption(f"ー {data['title']}")
+        for q, a in data['content']:
+            st.markdown(f"""<div class="guide-card"><div class="guide-label">{q}</div><div class="guide-text">{a}</div></div>""", unsafe_allow_html=True)
+            
+    with tab2:
+        data = DECO_GUIDE["action"]
+        st.caption(f"ー {data['title']}")
+        for q, a in data['content']:
+            st.markdown(f"""<div class="guide-card"><div class="guide-label">{q}</div><div class="guide-text">{a}</div></div>""", unsafe_allow_html=True)
+            
+    with tab3:
+        data = DECO_GUIDE["future"]
+        st.caption(f"ー {data['title']}")
+        for q, a in data['content']:
+            st.markdown(f"""<div class="guide-card"><div class="guide-label">{q}</div><div class="guide-text">{a}</div></div>""", unsafe_allow_html=True)
+            
+    st.markdown('</div>', unsafe_allow_html=True) # close guidebook-box
+
+    # --- デコ活の木 ---
     st.markdown("""
     <div style="text-align:center; position:relative; margin-bottom:30px; margin-top:10px;">
         <div style="font-size:160px; line-height:1; filter: drop-shadow(0 15px 15px rgba(0,100,0,0.2)); z-index:2; position:relative;">🌳</div>
@@ -261,6 +349,7 @@ def view_home():
     </div>
     """, unsafe_allow_html=True)
     
+    # CTAボタン
     st.markdown('<div class="big-action-btn">', unsafe_allow_html=True)
     if st.button("📝 きょうの記録をつける！", use_container_width=True):
         go_to('ACTION')
@@ -268,6 +357,7 @@ def view_home():
     
     st.write("") 
     
+    # メニュー
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
@@ -279,10 +369,11 @@ def view_home():
         st.markdown('</div>', unsafe_allow_html=True)
     with c3:
         st.markdown('<div class="menu-btn">', unsafe_allow_html=True)
-        if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True): st.toast("6月5日オープン！", icon="🔒")
+        if st.button("🎓\nクイズ", key="m_quiz", use_container_width=True):
+            st.toast("まずはガイドブックで勉強してね！", icon="📖")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# --- アクション記録画面 (★DB保存機能付き) ---
+# --- アクション記録画面 ---
 def view_action():
     render_header()
     if st.button("🏠 ホームに戻る"): go_to('HOME')
@@ -294,7 +385,6 @@ def view_action():
     
     st.info(f"【{selected}】 できたこと全部にチェック！")
     
-    # アクション定義 (5項目)
     acts = [
         ("💡", "電気をこまめに消した", 50, "elec"),
         ("🍚", "ご飯を残さず食べた", 100, "food"),
@@ -303,7 +393,6 @@ def view_action():
         ("👨‍👩‍👧", "おうちの人も一緒にできた", 50, "family")
     ]
     
-    # Session Stateから完了済みリストを取得
     completed_today = st.session_state.action_log.get(selected, [])
     
     for icon, label, pt, act_id in acts:
@@ -312,25 +401,15 @@ def view_action():
             with c_icon: st.markdown(f"<div style='font-size:36px; text-align:center'>{icon}</div>", unsafe_allow_html=True)
             with c_lbl: st.markdown(f"<div style='font-weight:bold; font-size:18px; margin-top:5px;'>{label}</div>", unsafe_allow_html=True)
             with c_btn:
-                # 完了済みなら無効化ボタン
                 if act_id in completed_today:
                     st.button(f"✅ 達成済", key=f"done_{selected}_{act_id}", disabled=True, use_container_width=True)
                 else:
-                    # 未完了なら押せるボタン
                     if st.button(f"できた! (+{pt})", key=f"{selected}_{act_id}", use_container_width=True):
-                        # 1. 状態更新
                         if selected not in st.session_state.action_log:
                             st.session_state.action_log[selected] = []
                         st.session_state.action_log[selected].append(act_id)
                         
-                        # 2. ポイント計算
-                        # (簡易的に現在のリスト長 * ポイント等ではなく、固定ポイントを加算するロジックが必要だが
-                        # ここではシンプルに「実施したアクションIDのリスト」をDBに送る)
-                        # ※本来は acts 配列からptを再計算すべきですが、Sync関数はリストを受け取るだけにします。
-                        
-                        # 3. ★DBに保存 (Upsert)
                         new_actions = st.session_state.action_log[selected]
-                        # ポイント概算 (デモ用)
                         total_pts = len(new_actions) * 50 
                         sync_action_to_db(st.session_state.user['id'], selected, new_actions, total_pts)
                         
@@ -457,7 +536,7 @@ def view_game():
             st.session_state.game_state = 'READY' 
 
 # ==========================================
-# 5. メインルーティング
+# 6. メインルーティング
 # ==========================================
 if __name__ == "__main__":
     p = st.session_state.page
